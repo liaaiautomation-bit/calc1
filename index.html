@@ -1,0 +1,388 @@
+<!doctype html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>מחשבון</title>
+<style>
+  :root {
+    --bg: #eef0f4;
+    --card: #ffffff;
+    --text: #1b1f27;
+    --muted: #7a8394;
+    --key: #f3f4f7;
+    --key-hover: #e7e9ee;
+    --fn: #e2e5ec;
+    --op: #ff9f1c;
+    --op-text: #ffffff;
+    --eq: #2b6ef2;
+    --shadow: 0 20px 50px rgba(20, 30, 60, .15);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0f1115;
+      --card: #1a1d24;
+      --text: #f2f4f8;
+      --muted: #8a93a6;
+      --key: #262a33;
+      --key-hover: #30353f;
+      --fn: #3a404c;
+      --op: #ff9f1c;
+      --op-text: #1a1d24;
+      --eq: #4c86ff;
+      --shadow: 0 20px 50px rgba(0, 0, 0, .5);
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    min-height: 100vh;
+    display: grid;
+    place-items: center;
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Assistant", "Rubik", sans-serif;
+    padding: 16px;
+  }
+  .calc {
+    width: 100%;
+    max-width: 360px;
+    background: var(--card);
+    border-radius: 28px;
+    padding: 22px;
+    box-shadow: var(--shadow);
+  }
+  h1 {
+    margin: 0 0 8px;
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--muted);
+  }
+  .display {
+    direction: ltr;
+    text-align: right;
+    padding: 12px 6px 18px;
+    min-height: 116px;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-end;
+    gap: 6px;
+  }
+  .expr {
+    color: var(--muted);
+    font-size: 18px;
+    min-height: 24px;
+    word-break: break-all;
+  }
+  .result {
+    font-size: 48px;
+    font-weight: 300;
+    line-height: 1.1;
+    word-break: break-all;
+    font-variant-numeric: tabular-nums;
+  }
+  .result.small { font-size: 34px; }
+  .result.error { color: #e5484d; font-size: 32px; }
+  .keys {
+    direction: ltr;
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 12px;
+  }
+  button {
+    font: inherit;
+    font-size: 24px;
+    height: 64px;
+    border: 0;
+    border-radius: 18px;
+    background: var(--key);
+    color: var(--text);
+    cursor: pointer;
+    transition: background .12s, transform .06s, filter .12s;
+    -webkit-tap-highlight-color: transparent;
+  }
+  button:hover { background: var(--key-hover); }
+  button:active, button.pressed { transform: scale(.95); }
+  button:focus-visible { outline: 3px solid var(--eq); outline-offset: 2px; }
+  .fn { background: var(--fn); font-size: 20px; }
+  .fn:hover { background: var(--fn); filter: brightness(.95); }
+  .op { background: var(--op); color: var(--op-text); font-size: 28px; }
+  .op:hover { background: var(--op); filter: brightness(1.07); }
+  .op.active { outline: 3px solid var(--text); outline-offset: -3px; }
+  .eq { background: var(--eq); color: #fff; font-size: 28px; }
+  .eq:hover { background: var(--eq); filter: brightness(1.08); }
+  .hint {
+    margin: 16px 0 0;
+    text-align: center;
+    font-size: 12px;
+    color: var(--muted);
+  }
+</style>
+</head>
+<body>
+  <main class="calc">
+    <h1>מחשבון</h1>
+    <div class="display" aria-live="polite">
+      <div class="expr" id="expr"></div>
+      <div class="result" id="result">0</div>
+    </div>
+    <div class="keys">
+      <button class="fn" data-action="clear" id="clearBtn">AC</button>
+      <button class="fn" data-action="negate">±</button>
+      <button class="fn" data-action="percent">%</button>
+      <button class="op" data-op="/">÷</button>
+
+      <button data-digit="7">7</button>
+      <button data-digit="8">8</button>
+      <button data-digit="9">9</button>
+      <button class="op" data-op="*">×</button>
+
+      <button data-digit="4">4</button>
+      <button data-digit="5">5</button>
+      <button data-digit="6">6</button>
+      <button class="op" data-op="-">−</button>
+
+      <button data-digit="1">1</button>
+      <button data-digit="2">2</button>
+      <button data-digit="3">3</button>
+      <button class="op" data-op="+">+</button>
+
+      <button data-digit="0">0</button>
+      <button data-action="dot">.</button>
+      <button class="fn" data-action="back" aria-label="מחק">⌫</button>
+      <button class="eq" data-action="equals">=</button>
+    </div>
+    <p class="hint">אפשר גם להקליד מהמקלדת · Enter לחישוב · Esc לניקוי</p>
+  </main>
+
+<script>
+  const OP_SYMBOL = { '+': '+', '-': '−', '*': '×', '/': '÷' };
+  const MAX_DIGITS = 15;
+
+  // tokens: alternating number strings and operator chars, e.g. ["12", "+", "3.5"]
+  let tokens = ['0'];
+  let lastExpr = '';      // expression shown after "="
+  let justEvaluated = false;
+  let error = false;
+
+  const exprEl = document.getElementById('expr');
+  const resultEl = document.getElementById('result');
+  const clearBtn = document.getElementById('clearBtn');
+
+  const isOp = t => t in OP_SYMBOL;
+  const last = () => tokens[tokens.length - 1];
+  const setLast = v => { tokens[tokens.length - 1] = v; };
+
+  function formatNumber(str) {
+    if (str === '' || str === '-') return str || '0';
+    const neg = str.startsWith('-');
+    const body = neg ? str.slice(1) : str;
+    if (body.includes('e')) return str;
+    const [int, frac] = body.split('.');
+    const grouped = int.replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+    return (neg ? '-' : '') + grouped + (frac !== undefined ? '.' + frac : '');
+  }
+
+  function numToString(n) {
+    if (!isFinite(n)) throw new Error('math');
+    const rounded = parseFloat(n.toPrecision(12));
+    if (Math.abs(rounded) >= 1e15 || (rounded !== 0 && Math.abs(rounded) < 1e-9)) {
+      return rounded.toExponential(6).replace(/\.?0+e/, 'e');
+    }
+    return String(rounded);
+  }
+
+  function evaluate(list) {
+    const t = [...list];
+    if (isOp(t[t.length - 1])) t.pop();
+    // first pass: × and ÷
+    const stack = [parseFloat(t[0])];
+    for (let i = 1; i < t.length; i += 2) {
+      const op = t[i], n = parseFloat(t[i + 1]);
+      if (op === '*') stack.push(stack.pop() * n);
+      else if (op === '/') {
+        if (n === 0) throw new Error('div0');
+        stack.push(stack.pop() / n);
+      } else stack.push(op, n);
+    }
+    // second pass: + and −
+    let acc = stack[0];
+    for (let i = 1; i < stack.length; i += 2) {
+      acc = stack[i] === '+' ? acc + stack[i + 1] : acc - stack[i + 1];
+    }
+    return acc;
+  }
+
+  function exprText(list) {
+    return list.map(t => isOp(t) ? ` ${OP_SYMBOL[t]} ` : formatNumber(t)).join('');
+  }
+
+  function render() {
+    document.querySelectorAll('.op').forEach(b => b.classList.remove('active'));
+    resultEl.classList.remove('error', 'small');
+
+    if (error) {
+      resultEl.textContent = 'לא ניתן לחלק באפס';
+      resultEl.classList.add('error');
+      exprEl.textContent = lastExpr;
+      clearBtn.textContent = 'AC';
+      return;
+    }
+
+    const lt = last();
+    let shown;
+    if (isOp(lt)) {
+      shown = tokens[tokens.length - 2];
+      document.querySelector(`.op[data-op="${CSS.escape(lt)}"]`)?.classList.add('active');
+    } else {
+      shown = lt;
+    }
+    const text = formatNumber(shown);
+    resultEl.textContent = text;
+    if (text.length > 11) resultEl.classList.add('small');
+
+    if (justEvaluated) {
+      exprEl.textContent = lastExpr;
+    } else if (tokens.length > 1) {
+      let preview = '';
+      if (!isOp(lt) && tokens.length >= 3) {
+        try { preview = ' = ' + formatNumber(numToString(evaluate(tokens))); } catch { preview = ''; }
+      }
+      exprEl.textContent = exprText(tokens) + preview;
+    } else {
+      exprEl.textContent = '';
+    }
+    clearBtn.textContent = (tokens.length === 1 && tokens[0] === '0') ? 'AC' : 'C';
+  }
+
+  function resetIfNeeded(keepResult) {
+    if (error) { tokens = ['0']; error = false; lastExpr = ''; }
+    if (justEvaluated) {
+      if (!keepResult) tokens = ['0'];
+      justEvaluated = false;
+    }
+  }
+
+  function digitCount(s) { return s.replace(/[^0-9]/g, '').length; }
+
+  function inputDigit(d) {
+    resetIfNeeded(false);
+    const lt = last();
+    if (isOp(lt)) { tokens.push(d); return; }
+    if (digitCount(lt) >= MAX_DIGITS) return;
+    if (lt === '0') setLast(d);
+    else if (lt === '-0') setLast('-' + d);
+    else setLast(lt + d);
+  }
+
+  function inputDot() {
+    resetIfNeeded(false);
+    const lt = last();
+    if (isOp(lt)) { tokens.push('0.'); return; }
+    if (!lt.includes('.')) setLast(lt + '.');
+  }
+
+  function inputOp(op) {
+    resetIfNeeded(true);
+    const lt = last();
+    if (isOp(lt)) { setLast(op); return; }
+    if (lt.endsWith('.')) setLast(lt.slice(0, -1));
+    tokens.push(op);
+  }
+
+  function negate() {
+    resetIfNeeded(true);
+    const lt = last();
+    if (isOp(lt)) { tokens.push('-0'); return; }
+    setLast(lt.startsWith('-') ? lt.slice(1) : '-' + lt);
+  }
+
+  function percent() {
+    resetIfNeeded(true);
+    const lt = last();
+    if (isOp(lt)) return;
+    // like most calculators: in "a + b%" b becomes a*b/100
+    const prevOp = tokens[tokens.length - 2];
+    let value = parseFloat(lt) / 100;
+    if ((prevOp === '+' || prevOp === '-') && tokens.length >= 3) {
+      value = evaluate(tokens.slice(0, -2)) * value;
+    }
+    setLast(numToString(value));
+  }
+
+  function backspace() {
+    if (error || justEvaluated) { clearAll(); return; }
+    const lt = last();
+    if (isOp(lt)) { tokens.pop(); return; }
+    let next = lt.slice(0, -1);
+    if (next === '' || next === '-') {
+      if (tokens.length > 1) { tokens.pop(); return; }
+      next = '0';
+    }
+    setLast(next);
+  }
+
+  function clearAll() {
+    if (!justEvaluated && !error && tokens.length > 1 && !isOp(last())) {
+      setLast('0'); // C: clear current entry only
+    } else {
+      tokens = ['0'];
+      lastExpr = '';
+    }
+    justEvaluated = false;
+    error = false;
+  }
+
+  function equals() {
+    if (error) return;
+    if (justEvaluated || tokens.length < 3) return;
+    const list = isOp(last()) ? tokens.slice(0, -1) : tokens;
+    lastExpr = exprText(list) + ' =';
+    try {
+      tokens = [numToString(evaluate(list))];
+      justEvaluated = true;
+    } catch {
+      error = true;
+      tokens = ['0'];
+    }
+  }
+
+  function handle(btn) {
+    if (btn.dataset.digit) inputDigit(btn.dataset.digit);
+    else if (btn.dataset.op) inputOp(btn.dataset.op);
+    else ({
+      clear: clearAll, negate, percent, dot: inputDot, back: backspace, equals
+    })[btn.dataset.action]?.();
+    render();
+  }
+
+  document.querySelector('.keys').addEventListener('click', e => {
+    const btn = e.target.closest('button');
+    if (btn) handle(btn);
+  });
+
+  const KEY_MAP = {
+    'Enter': '[data-action="equals"]', '=': '[data-action="equals"]',
+    'Escape': '[data-action="clear"]', 'Delete': '[data-action="clear"]',
+    'Backspace': '[data-action="back"]',
+    '.': '[data-action="dot"]', ',': '[data-action="dot"]',
+    '%': '[data-action="percent"]',
+    '+': '[data-op="+"]', '-': '[data-op="-"]', '*': '[data-op="*"]',
+    'x': '[data-op="*"]', 'X': '[data-op="*"]', '/': '[data-op="/"]'
+  };
+
+  document.addEventListener('keydown', e => {
+    if (e.metaKey || e.ctrlKey || e.altKey) return;
+    const sel = /^[0-9]$/.test(e.key) ? `[data-digit="${e.key}"]` : KEY_MAP[e.key];
+    if (!sel) return;
+    e.preventDefault();
+    const btn = document.querySelector('.keys ' + sel);
+    btn.classList.add('pressed');
+    setTimeout(() => btn.classList.remove('pressed'), 100);
+    handle(btn);
+  });
+
+  render();
+</script>
+</body>
+</html>

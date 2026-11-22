@@ -1,0 +1,1498 @@
+<!doctype html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>בין המרפסות</title>
+<style>
+  :root {
+    --bg: #ebe7f1;
+    --panel: #ffffff;
+    --panel-2: #f3f0f8;
+    --text: #1e1b2b;
+    --muted: #6d6880;
+    --accent: #d97b2f;
+    --accent-text: #ffffff;
+    --soft: #efe3d6;
+    --warn: #8a5a3c;
+    --line: rgba(30, 27, 43, .12);
+    --shadow: 0 18px 50px rgba(30, 20, 60, .18);
+    --backdrop: rgba(18, 14, 30, .55);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0d0c14;
+      --panel: #1b1926;
+      --panel-2: #25222f;
+      --text: #f1eef7;
+      --muted: #a39eb4;
+      --accent: #f0a052;
+      --accent-text: #1b1926;
+      --soft: #2d2630;
+      --warn: #e4b08a;
+      --line: rgba(255, 255, 255, .1);
+      --shadow: 0 18px 50px rgba(0, 0, 0, .5);
+      --backdrop: rgba(5, 4, 10, .62);
+    }
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; margin: 0; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Assistant", "Rubik", sans-serif;
+    overflow: hidden;
+    -webkit-user-select: none;
+    user-select: none;
+    -webkit-tap-highlight-color: transparent;
+  }
+  button { font: inherit; color: inherit; cursor: pointer; }
+  button:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+
+  #app {
+    position: relative;
+    height: 100vh;
+    height: 100dvh;
+    max-width: 1100px;
+    margin: 0 auto;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    padding: 10px 16px calc(10px + env(safe-area-inset-bottom));
+  }
+
+  /* ---------- HUD ---------- */
+  .hud { display: flex; align-items: center; gap: 10px; }
+  .lives {
+    display: flex; align-items: center; gap: 8px;
+    background: #1f1c2e; border-radius: 999px;
+    padding: 6px 12px; box-shadow: 0 2px 10px rgba(0,0,0,.12);
+    flex: none;
+  }
+  .lives .lbl { font-size: 13px; font-weight: 700; color: #cfc8de; }
+  #cigs { display: flex; gap: 3px; direction: ltr; }
+  #cigs svg { width: 32px; height: 16px; display: block; overflow: visible; }
+  #cigs .body { fill: #f5f1e8; }
+  #cigs .filter { fill: #d79a5e; }
+  #cigs .ember { fill: #ff7a3d; }
+  #cigs .smoke { fill: none; stroke: #b9b3c6; stroke-width: 1.2; stroke-linecap: round; opacity: .8; animation: smoke 2.4s ease-in-out infinite; }
+  #cigs .out .body, #cigs .out .filter { opacity: .28; }
+  #cigs .out .ember { fill: #8d8899; opacity: .5; }
+  #cigs .out .smoke { display: none; }
+  #cigs .just-out { animation: snuff .9s ease-out; }
+  @keyframes smoke { 0%,100% { transform: translateY(0); opacity: .2; } 50% { transform: translateY(-2px); opacity: .9; } }
+  @keyframes snuff { 0% { transform: scale(1.35); } 100% { transform: scale(1); } }
+
+  .objective {
+    flex: 1; min-width: 0;
+    font-size: 14px; line-height: 1.3;
+    color: var(--muted);
+  }
+  .objective b { color: var(--text); font-weight: 700; }
+  .iconbtn {
+    flex: none;
+    width: 40px; height: 40px; border-radius: 50%;
+    border: 0; background: var(--panel);
+    font-size: 18px; font-weight: 700;
+    box-shadow: 0 2px 10px rgba(0,0,0,.08);
+    display: grid; place-items: center;
+  }
+
+  /* ---------- Stage ---------- */
+  .stage {
+    position: relative;
+    flex: 1 1 auto;
+    min-height: 220px;
+    border-radius: 20px;
+    overflow: hidden;
+    background: #141a30;
+    box-shadow: var(--shadow);
+  }
+  canvas { display: block; width: 100%; height: 100%; }
+  #caption {
+    position: absolute; inset-inline: 12px; bottom: 12px;
+    margin: 0 auto; max-width: 560px;
+    background: rgba(16, 13, 28, .78);
+    color: #f6f1ff;
+    border-radius: 14px;
+    padding: 10px 14px;
+    font-size: 15px; line-height: 1.45;
+    opacity: 0; transform: translateY(6px);
+    transition: opacity .35s, transform .35s;
+    pointer-events: none;
+  }
+  #caption.show { opacity: 1; transform: none; }
+  #toast {
+    position: absolute; top: 10px; left: 50%;
+    transform: translate(-50%, -8px);
+    background: rgba(255, 236, 205, .95); color: #4a3320;
+    border-radius: 999px; padding: 6px 14px;
+    font-size: 13px; font-weight: 700;
+    opacity: 0; transition: opacity .3s, transform .3s;
+    pointer-events: none; white-space: nowrap;
+  }
+  #toast.show { opacity: 1; transform: translate(-50%, 0); }
+  #fade {
+    position: absolute; inset: 0;
+    background: #0b0a12; opacity: 0;
+    transition: opacity .28s; pointer-events: none;
+  }
+
+  /* ---------- Controls ---------- */
+  .controls { display: flex; gap: 10px; direction: ltr; flex: none; }
+  .controls button {
+    height: 62px; border: 0; border-radius: 18px;
+    background: var(--panel); box-shadow: 0 3px 12px rgba(0,0,0,.1);
+    touch-action: manipulation;
+    transition: transform .06s, background .15s, opacity .15s;
+  }
+  .controls button.pressed, .controls button:active { transform: scale(.96); background: var(--panel-2); }
+  #btnLeft, #btnRight { flex: 0 0 86px; font-size: 24px; }
+  #btnAct {
+    flex: 1; direction: rtl;
+    font-size: 17px; font-weight: 700;
+    background: var(--accent); color: var(--accent-text);
+  }
+  #btnAct.idle { background: var(--panel); color: var(--muted); font-weight: 600; }
+  .keyhint { font-size: 12px; color: var(--muted); text-align: center; margin: -4px 0 0; flex: none; }
+  @media (pointer: coarse) { .keyhint { display: none; } }
+
+  /* ---------- Screens & modal ---------- */
+  .screen {
+    position: absolute; inset: 0; z-index: 20;
+    display: none; align-items: center; justify-content: center;
+    padding: 16px;
+    background: var(--backdrop);
+  }
+  .screen.show { display: flex; animation: appear .25s ease-out; }
+  @keyframes appear { from { opacity: 0; } to { opacity: 1; } }
+  .card {
+    background: var(--panel);
+    border-radius: 22px;
+    width: 100%; max-width: 520px; max-height: 100%;
+    overflow: auto;
+    padding: 22px;
+    box-shadow: var(--shadow);
+  }
+  .card h1 { margin: 0; font-size: 34px; line-height: 1.1; letter-spacing: -.5px; }
+  .card h2 { margin: 0 0 8px; font-size: 22px; }
+  .tagline { margin: 6px 0 14px; color: var(--accent); font-weight: 700; }
+  .card p { margin: 0 0 12px; line-height: 1.55; font-size: 16px; }
+  .card .muted { color: var(--muted); font-size: 14px; }
+  .btnrow { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 16px; }
+  .btn {
+    border: 0; border-radius: 14px;
+    padding: 12px 18px; font-size: 16px; font-weight: 700;
+    background: var(--panel-2);
+  }
+  .btn.primary { background: var(--accent); color: var(--accent-text); }
+  .howto { margin: 0; padding: 0; list-style: none; display: grid; gap: 10px; }
+  .howto li { display: flex; gap: 10px; align-items: flex-start; line-height: 1.45; font-size: 15px; }
+  .howto .k {
+    flex: none; min-width: 64px; text-align: center;
+    background: var(--panel-2); border-radius: 8px;
+    padding: 3px 6px; font-size: 13px; font-weight: 700; direction: ltr;
+  }
+  .helpline {
+    margin-top: 14px;
+    background: var(--soft);
+    border-radius: 14px;
+    padding: 10px 14px;
+    font-size: 14px; line-height: 1.5;
+  }
+  .helpline a { color: inherit; font-weight: 700; }
+
+  .speaker { font-size: 13px; font-weight: 800; color: var(--accent); margin-bottom: 4px; letter-spacing: .3px; }
+  .note { font-size: 14px !important; color: var(--warn); font-weight: 600; }
+  .note.good { color: #3f8f6b; }
+  .opts { display: grid; gap: 8px; margin-top: 14px; }
+  .opt {
+    display: flex; gap: 10px; align-items: flex-start; text-align: start;
+    border: 1px solid var(--line); border-radius: 14px;
+    background: var(--panel-2);
+    padding: 12px 14px; font-size: 16px; line-height: 1.4;
+  }
+  .opt:hover { border-color: var(--accent); }
+  .opt .num {
+    flex: none; width: 24px; height: 24px; border-radius: 50%;
+    background: var(--panel); color: var(--muted);
+    display: grid; place-items: center; font-size: 13px; font-weight: 800;
+  }
+  .opt.primary { justify-content: center; background: var(--accent); color: var(--accent-text); border-color: transparent; font-weight: 700; }
+
+  #screenEnd .card { text-align: center; }
+  #screenEnd .card p { text-align: start; }
+  .endmark { font-size: 40px; margin-bottom: 4px; }
+
+  @media (max-width: 520px) {
+    #app { padding-inline: 10px; gap: 8px; }
+    .objective { font-size: 13px; }
+    .lives { padding: 5px 9px; gap: 6px; }
+    .lives .lbl { display: none; }
+    #cigs svg { width: 26px; height: 14px; }
+    .card { padding: 18px; }
+    .card h1 { font-size: 28px; }
+    .card p, .opt { font-size: 15px; }
+    #btnLeft, #btnRight { flex-basis: 76px; }
+    #caption { font-size: 14px; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { animation: none !important; transition: none !important; }
+  }
+</style>
+</head>
+<body>
+<div id="app">
+  <header class="hud">
+    <div class="lives" id="lives" role="img" aria-label="חיים: 5 מתוך 5">
+      <span class="lbl">חיים</span>
+      <span id="cigs"></span>
+    </div>
+    <div class="objective" id="objective" aria-live="polite"></div>
+    <button class="iconbtn" id="btnHelp" aria-label="הוראות">?</button>
+    <button class="iconbtn" id="btnRestart" aria-label="להתחיל מחדש">↺</button>
+  </header>
+
+  <div class="stage" id="stage">
+    <canvas id="cv" aria-label="המשחק: אבי בין המרפסות"></canvas>
+    <div id="caption" role="status"></div>
+    <div id="toast"></div>
+    <div id="fade"></div>
+  </div>
+
+  <div class="controls">
+    <button id="btnLeft" aria-label="ללכת שמאלה">◀</button>
+    <button id="btnAct" class="idle">ללכת</button>
+    <button id="btnRight" aria-label="ללכת ימינה">▶</button>
+  </div>
+  <p class="keyhint">← → ללכת · ↑ או Enter לפעולה</p>
+
+  <!-- Title -->
+  <section class="screen show" id="screenTitle" aria-labelledby="ttl">
+    <div class="card">
+      <h1 id="ttl">בין המרפסות</h1>
+      <div class="tagline">משחק קצר על הדרך פנימה</div>
+      <p>אמצע הלילה. אבי הלך לאיבוד בין המרפסות של הבניין, וכל אחת נראית כמו הקודמת, רק עם כביסה של מישהו אחר.</p>
+      <p>עזרו לו להתרחק מהמעקה, למצוא את הדרך פנימה ולהגיע לאדם שהוא סומך עליו.</p>
+      <div class="btnrow">
+        <button class="btn primary" id="btnStart">להתחיל</button>
+        <button class="btn" id="btnHowto">איך משחקים?</button>
+      </div>
+      <p class="muted" style="margin-top:14px">המשחק עוסק במצוקה רגשית, בעדינות ובלי תיאורים קשים.</p>
+      <div class="helpline">אם אתם או מישהו קרוב אליכם במצוקה, אפשר לדבר עם מישהו. <b>ער״ן</b>: <a href="tel:1201">1201</a> (24/7) · <b>סה״ר</b>: <a href="https://sahar.org.il" target="_blank" rel="noopener">sahar.org.il</a> · במצב חירום: <a href="tel:101">101</a></div>
+    </div>
+  </section>
+
+  <!-- How to play -->
+  <section class="screen" id="screenHelp" aria-labelledby="hlp">
+    <div class="card">
+      <h2 id="hlp">איך משחקים</h2>
+      <ul class="howto">
+        <li><span class="k">← →</span><span>ללכת (או A / D). במסך מגע: הכפתורים למטה. רק הליכה, בלי קפיצות ובלי טיפוס.</span></li>
+        <li><span class="k">↑ / Enter</span><span>פעולה ליד דלת, אדם או חפץ: להיכנס, לדבר, להתקשר, לפתוח.</span></li>
+        <li><span class="k">1 2 3</span><span>בחירה. בחרו את הפעולה שבאמת תומכת באבי.</span></li>
+        <li><span class="k">🚬 × 5</span><span>הסיגריות הן מונה החיים. בחירה שגויה או מבוי סתום מכבות אחת ומחזירות לנקודת הביקורת האחרונה.</span></li>
+        <li><span class="k">💡</span><span>חפשו אור חם. דלתות עם אור קר מובילות בדרך כלל למבוי סתום.</span></li>
+      </ul>
+      <div class="btnrow">
+        <button class="btn primary" id="btnHelpClose">הבנתי</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- Dialog / message -->
+  <section class="screen" id="modal" role="dialog" aria-modal="true" aria-labelledby="mText">
+    <div class="card">
+      <div class="speaker" id="mSpeaker"></div>
+      <h2 id="mTitle"></h2>
+      <p id="mText"></p>
+      <p class="note" id="mNote"></p>
+      <div class="opts" id="mOpts"></div>
+    </div>
+  </section>
+
+  <!-- End -->
+  <section class="screen" id="screenEnd" aria-labelledby="eTitle">
+    <div class="card">
+      <div class="endmark" id="eMark">☕</div>
+      <h2 id="eTitle"></h2>
+      <p id="eText"></p>
+      <div class="helpline">אם אתם או מישהו קרוב אליכם במצוקה, לא צריך לעבור את זה לבד. <b>ער״ן</b>: <a href="tel:1201">1201</a> (24/7) · <b>סה״ר</b>: <a href="https://sahar.org.il" target="_blank" rel="noopener">sahar.org.il</a> · במצב חירום: <a href="tel:101">101</a></div>
+      <div class="btnrow" style="justify-content:center">
+        <button class="btn primary" id="btnAgain">להתחיל מחדש</button>
+      </div>
+    </div>
+  </section>
+</div>
+
+<script>
+(() => {
+  'use strict';
+
+  /* =========================================================
+     Constants & state
+     ========================================================= */
+  const H = 360, FLOOR = 292, SPEED = 150, REACH = 56, MAX_LIVES = 5, MIN_VIEW = 390;
+  const START = { scene: 'balcony7', x: 140 };
+  const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  const $ = id => document.getElementById(id);
+  const stage = $('stage'), cv = $('cv'), c = cv.getContext('2d');
+
+  const S = {
+    mode: 'title',            // title | play | modal | help | end
+    scene: START.scene, x: START.x, facing: 1, phase: 0, moving: false,
+    lives: MAX_LIVES, flags: {}, cp: { ...START }, visited: {},
+    won: false, t: 0, busy: false, cam: 0, mood: 0, near: null,
+  };
+  const F = S.flags;
+
+  /* =========================================================
+     Story text
+     ========================================================= */
+  const SAY = {
+    plant:     { speaker: 'עציץ עם פרצוף', text: 'אני תקוע בעציץ הזה כבר שלוש שנים. לך יש רגליים. תשתמש בהן: רחוק מהמעקה, לכיוון פנימה.' },
+    phoneDone: { speaker: 'הטלפון', text: '1% סוללה. הוא עשה את שלו. דני בדרך.' },
+    gateWait:  { speaker: 'אבי חושב', text: 'שער קטן במחיצה בין המרפסות. אבי מהסס מולו. אולי קודם שיחה אחת, למישהו שאפשר לסמוך עליו?' },
+    chair:     { speaker: 'כיסא פלסטיק', text: 'כיסא פלסטיק לבן ששרד ארבעה חורפים ושלוש מסיבות. הוא לא אומר כלום. הוא פשוט שם, וזה גם משהו.' },
+    cat:       { speaker: 'חתול עם עניבה', text: 'החתול מביט באבי כאילו הוא חייב לו כסף. אחרי רגע הוא ממצמץ לאט. בשפת חתולים זה אומר: "אתה בסדר. תדפוק על החלון."' },
+    leviAfter: { speaker: 'גברת לוי', text: '"הדלת פתוחה, מותק. תיכנס כבר, התה מתקרר והחתול מתחיל לדאוג."' },
+    doorLocked:{ speaker: 'דלת המרפסת', text: 'הדלת נעולה מבפנים. בחלון ליד יש אור, ומישהו עוד ער.' },
+    leviIn:    { speaker: 'גברת לוי', text: '"אחיך התקשר מהאוטו. אמרתי לו לעלות ישר למטבח. תלך אחרי הריח של הטוסט, בסוף תמיד מגיעים לשם."' },
+    painting:  { speaker: 'ציור על הקיר', text: 'ציור של דלת. מתחתיו כתוב "זו לא דלת". לפחות הוא כן.' },
+    clock:     { speaker: 'שעון עם דג', text: 'השעה: רבע לדג. הזמן פה זז לאט, וזה דווקא בסדר.' },
+    fridge:    { speaker: 'מקרר', text: 'המגנטים על המקרר מסודרים למילה "לנשום". מישהו פה חשב קדימה.' },
+    kettle:    { speaker: 'קומקום', text: 'הקומקום שורק בהתלהבות, כאילו חיכה לאבי כל הלילה.' },
+  };
+
+  const DEAD = {
+    cold7:   'מאחורי הדלת יש עוד מרפסת, ועליה רק כביסה שמתנופפת לבד ושלט: "גם לא כאן". זה לא הכיוון פנימה.',
+    storage: 'מחסן מלא באופניים שאף אחד לא רכב עליהם מאז 2009. אין מכאן דרך פנימה, רק אבק ונוסטלגיה.',
+    lemon:   'חדר אמבטיה. ברווז גומי מביט באבי בהזדהות עמוקה. נחמד, אבל דני לא כאן.',
+    moth:    'ארון מעילים. חמים, חשוך, ומריח כמו 1987. זה מקום טוב להתחבא בו, לא להיפגש בו.',
+  };
+
+  const CHOICE = {
+    phone: {
+      speaker: 'הטלפון של אבי',
+      text: '4% סוללה. מספיק לשיחה אחת, אם היא חשובה.',
+      options: [
+        { label: 'לכתוב בקבוצה המשפחתית "הכול סבבה 👍" ולשים בכיס', reply: 'שלושה אנשים החזירו 👍. אף אחד לא שאל. אבי נשאר לבד עם הרוח.' },
+        { label: 'להתקשר לדני, אח שלו', ok: true, set: 'called', replySpeaker: 'דני',
+          reply: 'דני עונה אחרי צלצול אחד. "אבי? אני שומע שזה לא טוב. אני יוצא אליך עכשיו. תתרחק מהמעקה ותיכנס פנימה. אצל גברת לוי מהמרפסת ליד תמיד יש אור. נפגש שם."' },
+        { label: 'לראות עוד שעה סרטונים של חתולים שמנגנים בפסנתר', reply: 'החתולים מנגנים יפה. הסוללה נגמרת באמצע הסונטה, והשקט חוזר.' },
+      ],
+    },
+    gate: {
+      speaker: 'שער קטן במחיצה',
+      text: 'השער סגור בתפס חלוד. מעבר לו יש מרפסת שכנה, ובחלון שלה דולק אור צהוב.',
+      options: [
+        { label: 'להרים את התפס ולפתוח מעבר למרפסת עם האור', ok: true, set: 'gateOpen',
+          reply: 'התפס חורק, כאילו גם הוא חיכה שמישהו יבקש. השער נפתח.', next: 'לעבור',
+          then: () => goTo('balcony6', 150) },
+        { label: 'לחכות שהלילה ייגמר לבד', reply: 'הלילה לא ממהר לשום מקום, וגם הרוח לא. לחכות לבד זה לא כמו לנוח.' },
+        { label: 'לחזור לטלפון ולבדוק אם דני כתב משהו', reply: 'דני לא כתב, הוא נוהג. הוא כבר אמר מה לעשות. השער עדיין סגור.' },
+      ],
+    },
+    levi: {
+      speaker: 'גברת לוי, בחלון',
+      text: 'אישה עם רולים בשיער ומשקפיים בגודל של צלחות מרימה את העיניים מהתשבץ. "אבי מקומה שבע? מה אתה עושה על המרפסת שלי בשעה כזאת?"',
+      options: [
+        { label: '"סליחה, רק בדקתי את העגבניות שלך"', reply: 'גברת לוי: "אין לי עגבניות. יש לי בזיליקום ודעות." היא סוגרת את החלון. אבי עדיין בחוץ.' },
+        { label: 'להתחבא מאחורי הכביסה ולקוות שלא ראתה', reply: 'היא ראתה. כולם תמיד רואים. אבל כשמתחבאים, קשה לעזור.' },
+        { label: 'להגיד בכנות: "אני לא במצב טוב. אפשר להיכנס? אחי בדרך."', ok: true, set: 'levi', replySpeaker: 'גברת לוי',
+          reply: 'גברת לוי מורידה את המשקפיים. "בטח, מותק. בוא פנימה, יש תה." היא פותחת את דלת המרפסת.' },
+      ],
+    },
+    danny: {
+      speaker: 'דני',
+      text: 'דני קם כשהוא רואה אותו. הוא לא שואל "מה קרה". הוא מחבק, מחזיק קצת יותר מדי זמן, ואומר: "אני פה. מה עובר עליך?"',
+      options: [
+        { label: '"סתם, הכול טוב. רק השתעממתי"', reply: 'דני מרים גבה. "אבי, נסעתי ארבעים דקות באמצע הלילה." המשפט נשאר תלוי באוויר כמו כביסה רטובה.' },
+        { label: '"קשה לי. ממש קשה. אני צריך שתהיה פה."', ok: true, win: true },
+        { label: 'להתנצל שהטריח אותו ולהציע שילך הביתה', reply: 'דני: "אתה לא מטריח. אתה אח שלי." אבל אבי כבר קם לכיוון הדלת, וזה בדיוק הכיוון ההפוך.' },
+      ],
+    },
+  };
+
+  /* =========================================================
+     Scenes
+     ========================================================= */
+  const DOOR = {
+    cold:    { fill: '#3c4f73', frame: '#232b40', glow: 'cold', icon: null },
+    storage: { fill: '#6c6f78', frame: '#3a3c44', sign: 'מחסן' },
+    glass:   { glass: true, fill: '#2b3350', frame: '#e8e3d8' },
+    lemon:   { fill: '#e7d27a', frame: '#8a7a3a', icon: 'lemon' },
+    moth:    { fill: '#7a5a42', frame: '#4a3526', icon: 'moth' },
+    toast:   { fill: '#c98e58', frame: '#6a4228', glow: 'warm', icon: 'toast' },
+    plain:   { fill: '#a98a6f', frame: '#5d4636' },
+  };
+
+  const SCENES = {
+    balcony7: {
+      title: 'מרפסת · קומה 7', outside: true, wind: true,
+      width: 1100, minX: 130, maxX: 990, mood: [0, .32],
+      left: 'corner', right: 'partitionGate',
+      intro: 'אבי עומד בפינה של המרפסת ולא ממש זוכר איך הגיע לכאן. הרוח מדברת יותר מדי. כדאי להתרחק מהמעקה.',
+      objective: () => !F.called ? '<b>להתרחק מהפינה</b> ולמצוא את הטלפון' : 'למצוא <b>מעבר</b> למרפסת השכנה',
+      windows: [560, 870],
+      objects: [
+        { x: 270, art: 'plant', label: 'עציץ עם פרצוף', verb: 'לדבר', use: () => say('plant') },
+        { x: 440, art: 'phone', label: 'הטלפון של אבי', verb: 'להתקשר', use: () => F.called ? say('phoneDone') : choose('phone') },
+        { x: 680, art: 'door', door: DOOR.cold, label: 'דלת עם אור כחול קר', verb: 'להיכנס', use: () => deadEnd('cold7') },
+        { x: 800, art: 'chair', label: 'כיסא פלסטיק', verb: 'להסתכל', use: () => say('chair') },
+        { x: 975, art: 'gate', label: 'שער קטן במחיצה', verb: 'לפתוח',
+          use: () => !F.called ? say('gateWait') : F.gateOpen ? goTo('balcony6', 150) : choose('gate') },
+      ],
+    },
+    balcony6: {
+      title: 'המרפסת השכנה', outside: true,
+      width: 1000, minX: 140, maxX: 870, mood: [.35, .55],
+      left: 'partitionOpen', right: 'wall',
+      intro: 'מרפסת שכנה. יותר עציצים, פחות רוח. בחלון דולק אור צהוב, ומישהו שם עוד ער.',
+      objective: () => !F.levi ? '<b>לבקש עזרה</b> ממי שבחלון' : '<b>להיכנס פנימה</b> דרך דלת המרפסת',
+      windows: [],
+      laundry: [200, 560],
+      objects: [
+        { x: 290, art: 'cat', label: 'חתול עם עניבה', verb: 'להסתכל', use: () => say('cat') },
+        { x: 450, art: 'door', door: DOOR.storage, label: 'דלת מחסן', verb: 'להיכנס', use: () => deadEnd('storage') },
+        { x: 650, art: 'leviWindow', label: 'החלון המואר', verb: 'לדפוק', use: () => F.levi ? say('leviAfter') : choose('levi') },
+        { x: 820, art: 'balconyDoor', label: 'דלת המרפסת', verb: 'להיכנס', use: () => F.levi ? goTo('living', 150) : say('doorLocked') },
+      ],
+    },
+    living: {
+      title: 'הסלון של גברת לוי', outside: false,
+      width: 1100, minX: 130, maxX: 1020, mood: [.62, .82],
+      intro: 'בפנים. חם, ומריח מתה ומרצפות נקיות. אבי נושם קצת יותר עמוק. עכשיו צריך למצוא את דני.',
+      objective: () => 'למצוא את <b>המטבח</b> (לפי הריח)',
+      objects: [
+        { x: 90, art: 'glassDecor' },
+        { x: 290, art: 'levi', label: 'גברת לוי', verb: 'לדבר', use: () => say('leviIn') },
+        { x: 470, art: 'door', door: DOOR.lemon, label: 'דלת עם ריח של לימונים', verb: 'להיכנס', use: () => deadEnd('lemon') },
+        { x: 610, art: 'clock', label: 'שעון עם דג', verb: 'להסתכל', use: () => say('clock') },
+        { x: 690, art: 'armchair' },
+        { x: 800, art: 'door', door: DOOR.moth, label: 'דלת עם ריח של נפטלין', verb: 'להיכנס', use: () => deadEnd('moth') },
+        { x: 900, art: 'painting', label: 'ציור של דלת', verb: 'להסתכל', use: () => say('painting') },
+        { x: 990, art: 'door', door: DOOR.toast, label: 'דלת עם ריח של טוסט ותה', verb: 'להיכנס', use: () => goTo('kitchen', 150) },
+      ],
+    },
+    kitchen: {
+      title: 'המטבח', outside: false,
+      width: 820, minX: 130, maxX: 600, mood: [.88, 1],
+      intro: 'המטבח. האור צהוב ורך, הקומקום רותח, וליד השולחן יושב מישהו מוכר.',
+      objective: () => '<b>לדבר עם דני</b>',
+      objects: [
+        { x: 90, art: 'doorDecor' },
+        { x: 250, art: 'fridge', label: 'מקרר', verb: 'להסתכל', use: () => say('fridge') },
+        { x: 370, art: 'kettle', label: 'קומקום', verb: 'להסתכל', use: () => say('kettle') },
+        { x: 500, art: 'kitchenWindow' },
+        { x: 650, art: 'danny', label: 'דני', verb: 'לדבר', use: () => choose('danny') },
+      ],
+    },
+  };
+
+  /* =========================================================
+     DOM refs
+     ========================================================= */
+  const elObjective = $('objective'), elCigs = $('cigs'), elLives = $('lives');
+  const elCaption = $('caption'), elToast = $('toast'), elFade = $('fade');
+  const btnAct = $('btnAct');
+  const scrTitle = $('screenTitle'), scrHelp = $('screenHelp'), scrEnd = $('screenEnd'), modal = $('modal');
+  const mSpeaker = $('mSpeaker'), mTitle = $('mTitle'), mText = $('mText'), mNote = $('mNote'), mOpts = $('mOpts');
+
+  /* =========================================================
+     Helpers
+     ========================================================= */
+  const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+  const lerp = (a, b, t) => a + (b - a) * t;
+  function hex(h) { const n = parseInt(h.slice(1), 16); return [n >> 16 & 255, n >> 8 & 255, n & 255]; }
+  function mix(a, b, t) {
+    const A = hex(a), B = hex(b);
+    return `rgb(${Math.round(lerp(A[0], B[0], t))},${Math.round(lerp(A[1], B[1], t))},${Math.round(lerp(A[2], B[2], t))})`;
+  }
+  function rng(seed) { let s = seed % 2147483647 || 1; return () => (s = s * 16807 % 2147483647) / 2147483647; }
+  function rr(x, y, w, h, r) {
+    c.beginPath();
+    c.moveTo(x + r, y); c.arcTo(x + w, y, x + w, y + h, r); c.arcTo(x + w, y + h, x, y + h, r);
+    c.arcTo(x, y + h, x, y, r); c.arcTo(x, y, x + w, y, r); c.closePath();
+  }
+  function line(x1, y1, x2, y2) { c.beginPath(); c.moveTo(x1, y1); c.lineTo(x2, y2); c.stroke(); }
+  function circle(x, y, r) { c.beginPath(); c.arc(x, y, r, 0, Math.PI * 2); c.fill(); }
+  function ellipse(x, y, rx, ry, rot = 0) { c.beginPath(); c.ellipse(x, y, rx, ry, rot, 0, Math.PI * 2); c.fill(); }
+  function glow(x, y, r, rgb, a) {
+    const g = c.createRadialGradient(x, y, 0, x, y, r);
+    g.addColorStop(0, `rgba(${rgb},${a})`); g.addColorStop(1, `rgba(${rgb},0)`);
+    c.fillStyle = g; c.fillRect(x - r, y - r, r * 2, r * 2);
+  }
+  const FONT = '"Segoe UI", -apple-system, BlinkMacSystemFont, Assistant, Rubik, sans-serif';
+
+  /* =========================================================
+     Lives (cigarettes)
+     ========================================================= */
+  const CIG_SVG = '<svg viewBox="0 0 60 18" aria-hidden="true"><rect class="filter" x="1" y="7" width="13" height="7" rx="1.5"/><rect class="body" x="14" y="7" width="36" height="7"/><rect class="ember" x="50" y="7" width="6" height="7" rx="1.5"/><path class="smoke" d="M54 5 q3 -2 0 -4"/></svg>';
+  function renderLives(justLost) {
+    elCigs.innerHTML = '';
+    for (let i = 0; i < MAX_LIVES; i++) {
+      const s = document.createElement('span');
+      s.innerHTML = CIG_SVG;
+      const out = i >= S.lives;
+      if (out) s.className = 'out';
+      if (justLost && i === S.lives) s.className = 'out just-out';
+      elCigs.append(s);
+    }
+    elLives.setAttribute('aria-label', `חיים: ${S.lives} מתוך ${MAX_LIVES}`);
+  }
+
+  /* =========================================================
+     Caption / toast / fade
+     ========================================================= */
+  let capTimer = 0, toastTimer = 0;
+  function caption(text, ms = 6000) {
+    elCaption.textContent = text; elCaption.classList.add('show');
+    clearTimeout(capTimer); capTimer = setTimeout(() => elCaption.classList.remove('show'), ms);
+  }
+  function hideCaption() { clearTimeout(capTimer); elCaption.classList.remove('show'); }
+  function toast(text) {
+    elToast.textContent = text; elToast.classList.add('show');
+    clearTimeout(toastTimer); toastTimer = setTimeout(() => elToast.classList.remove('show'), 1800);
+  }
+  function transition(fn) {
+    S.busy = true;
+    const d = reduceMotion ? 20 : 300;
+    elFade.style.opacity = 1;
+    setTimeout(() => { fn(); snapCam(); elFade.style.opacity = 0; setTimeout(() => { S.busy = false; }, d * .7); }, d);
+  }
+
+  /* =========================================================
+     Modal & flow
+     ========================================================= */
+  let modalBtns = [];
+  function openModal({ speaker, title, text, note, noteGood, options }) {
+    S.mode = 'modal';
+    clearInput();
+    mSpeaker.textContent = speaker || ''; mSpeaker.hidden = !speaker;
+    mTitle.textContent = title || ''; mTitle.hidden = !title;
+    mText.textContent = text || '';
+    mNote.textContent = note || ''; mNote.hidden = !note;
+    mNote.classList.toggle('good', !!noteGood);
+    mOpts.innerHTML = ''; modalBtns = [];
+    const many = options.length > 1;
+    options.forEach((o, i) => {
+      const b = document.createElement('button');
+      b.className = 'opt' + (o.primary ? ' primary' : '');
+      if (many && !o.primary) {
+        const n = document.createElement('span'); n.className = 'num'; n.textContent = i + 1; b.append(n);
+      }
+      const t = document.createElement('span'); t.textContent = o.label; b.append(t);
+      b.addEventListener('click', () => { closeModal(); if (o.onPick) o.onPick(); });
+      mOpts.append(b); modalBtns.push(b);
+    });
+    modal.classList.add('show');
+    setTimeout(() => modalBtns[0] && modalBtns[0].focus({ preventScroll: true }), 30);
+  }
+  function closeModal() {
+    modal.classList.remove('show');
+    if (S.mode === 'modal') S.mode = 'play';
+    if (document.activeElement) document.activeElement.blur();
+  }
+
+  function say(id) {
+    const d = SAY[id];
+    openModal({ speaker: d.speaker, text: d.text, options: [{ label: 'המשך', primary: true }] });
+  }
+  function choose(id) {
+    const d = CHOICE[id];
+    openModal({
+      speaker: d.speaker, text: d.text,
+      options: d.options.map(o => ({ label: o.label, onPick: () => o.ok ? succeed(o, d) : fail(o.reply) })),
+    });
+  }
+  function succeed(o, d) {
+    if (o.set) F[o.set] = true;
+    if (o.win) { win(); return; }
+    setCheckpoint(S.scene, S.x, false);
+    openModal({
+      speaker: o.replySpeaker || d.speaker, text: o.reply,
+      note: '✓ נקודת ביקורת נשמרה', noteGood: true,
+      options: [{ label: o.next || 'המשך', primary: true, onPick: o.then }],
+    });
+  }
+  function fail(text, title = 'נשימה עמוקה') {
+    S.lives = Math.max(0, S.lives - 1);
+    renderLives(true);
+    const out = S.lives === 0;
+    openModal({
+      title, text,
+      note: out ? 'זו הייתה הסיגריה האחרונה.' : `סיגריה אחת כבתה (נשארו ${S.lives}). חוזרים לנקודת הביקורת האחרונה.`,
+      options: [{ label: out ? 'להמשיך' : 'לנסות שוב', primary: true, onPick: out ? gameOver : respawn }],
+    });
+  }
+  function deadEnd(id) { fail(DEAD[id], 'מבוי סתום'); }
+
+  function setCheckpoint(scene, x, announce) {
+    S.cp = { scene, x };
+    if (announce) toast('✓ נקודת ביקורת');
+  }
+  function goTo(scene, x) {
+    transition(() => {
+      S.scene = scene; S.x = x; S.facing = 1;
+      setCheckpoint(scene, x, true);
+      if (!S.visited[scene]) { S.visited[scene] = true; caption(SCENES[scene].intro, 6500); }
+    });
+  }
+  function respawn() {
+    hideCaption();
+    transition(() => { S.scene = S.cp.scene; S.x = S.cp.x; S.facing = 1; });
+  }
+
+  function showEnd(kind) {
+    S.mode = 'end'; clearInput(); hideCaption();
+    if (kind === 'win') {
+      $('eMark').textContent = '☕';
+      $('eTitle').textContent = 'בפנים.';
+      $('eText').textContent = 'אבי אומר את זה בקול, אולי בפעם הראשונה. דני לא ממהר לתקן כלום. הוא מכין עוד תה, מתיישב קרוב, ונשאר. גברת לוי מביאה עוגיות בצורת ירח ומעמידה פנים שהיא לא מקשיבה. בחוץ מתחיל להאיר. הלילה לא פתר הכול, אבל אבי כבר לא לבד בזה. מחר בבוקר הם יתקשרו יחד לקבוע שיחה עם איש מקצוע.';
+      $('btnAgain').textContent = 'לשחק שוב';
+    } else {
+      $('eMark').textContent = '🌙';
+      $('eTitle').textContent = 'הלילה עוד לא נגמר';
+      $('eText').textContent = 'כל הסיגריות כבו. אבי מתיישב רגע על כיסא הפלסטיק, רחוק מהמעקה, ונושם. אפשר לנסות שוב מההתחלה. דני עדיין במרחק שיחה אחת.';
+      $('btnAgain').textContent = 'להתחיל מחדש';
+    }
+    scrEnd.classList.add('show');
+    setTimeout(() => $('btnAgain').focus({ preventScroll: true }), 30);
+  }
+  function win() { S.won = true; S.scene = 'kitchen'; snapCam(); setTimeout(() => showEnd('win'), reduceMotion ? 0 : 700); S.mode = 'end'; }
+  function gameOver() { showEnd('over'); }
+
+  function newGame() {
+    for (const k in F) delete F[k];
+    Object.assign(S, {
+      scene: START.scene, x: START.x, facing: 1, phase: 0, moving: false,
+      lives: MAX_LIVES, cp: { ...START }, visited: { [START.scene]: true },
+      won: false, busy: false, mode: 'play',
+    });
+    [scrTitle, scrHelp, scrEnd, modal].forEach(s => s.classList.remove('show'));
+    renderLives(false);
+    snapCam();
+    S.mood = SCENES[S.scene].mood[0];
+    caption(SCENES[S.scene].intro, 7000);
+    if (document.activeElement) document.activeElement.blur();
+  }
+
+  /* =========================================================
+     Input
+     ========================================================= */
+  const keys = { left: false, right: false }, hold = { left: false, right: false };
+  function clearInput() { keys.left = keys.right = hold.left = hold.right = false; document.querySelectorAll('.controls .pressed').forEach(b => b.classList.remove('pressed')); }
+
+  document.addEventListener('keydown', e => {
+    if (e.metaKey || e.ctrlKey || e.altKey) return;
+    if (S.mode === 'modal') {
+      if (/^[1-9]$/.test(e.key) && modalBtns[+e.key - 1]) { e.preventDefault(); modalBtns[+e.key - 1].click(); }
+      return;
+    }
+    if (S.mode !== 'play') return;
+    const k = e.key, code = e.code;
+    if (k === 'ArrowLeft' || code === 'KeyA') { keys.left = true; e.preventDefault(); }
+    else if (k === 'ArrowRight' || code === 'KeyD') { keys.right = true; e.preventDefault(); }
+    else if ((k === 'ArrowUp' || k === 'Enter' || code === 'KeyW' || code === 'KeyE') && !e.repeat) { e.preventDefault(); interact(); }
+  });
+  document.addEventListener('keyup', e => {
+    if (e.key === 'ArrowLeft' || e.code === 'KeyA') keys.left = false;
+    if (e.key === 'ArrowRight' || e.code === 'KeyD') keys.right = false;
+  });
+  window.addEventListener('blur', clearInput);
+
+  function bindHold(btn, dir) {
+    btn.addEventListener('pointerdown', e => {
+      e.preventDefault();
+      if (S.mode !== 'play') return;
+      hold[dir] = true; btn.classList.add('pressed');
+      try { btn.setPointerCapture(e.pointerId); } catch (_) {}
+    });
+    const off = () => { hold[dir] = false; btn.classList.remove('pressed'); };
+    ['pointerup', 'pointercancel', 'lostpointercapture'].forEach(ev => btn.addEventListener(ev, off));
+    btn.addEventListener('contextmenu', e => e.preventDefault());
+  }
+  bindHold($('btnLeft'), 'left');
+  bindHold($('btnRight'), 'right');
+  btnAct.addEventListener('click', () => { if (S.mode === 'play') interact(); });
+
+  $('btnStart').addEventListener('click', newGame);
+  $('btnHowto').addEventListener('click', () => { S.helpFrom = 'title'; scrTitle.classList.remove('show'); scrHelp.classList.add('show'); $('btnHelpClose').textContent = 'הבנתי, מתחילים'; $('btnHelpClose').focus(); });
+  $('btnHelp').addEventListener('click', () => {
+    if (S.mode !== 'play') return;
+    S.helpFrom = 'play'; S.mode = 'help'; clearInput();
+    $('btnHelpClose').textContent = 'חזרה למשחק';
+    scrHelp.classList.add('show'); $('btnHelpClose').focus();
+  });
+  $('btnHelpClose').addEventListener('click', () => {
+    scrHelp.classList.remove('show');
+    if (S.helpFrom === 'title') newGame(); else { S.mode = 'play'; document.activeElement.blur(); }
+  });
+  $('btnRestart').addEventListener('click', () => {
+    if (S.mode === 'title') return;
+    if (S.mode === 'end') { newGame(); return; }
+    if (S.mode !== 'play') return;
+    openModal({
+      title: 'להתחיל מחדש?', text: 'כל ההתקדמות תתאפס, וכל חמש הסיגריות יחזרו.',
+      options: [{ label: 'כן, להתחיל מחדש', onPick: newGame }, { label: 'ביטול, להמשיך לשחק' }],
+    });
+  });
+  $('btnAgain').addEventListener('click', newGame);
+
+  function interact() {
+    if (S.busy || !S.near) return;
+    hideCaption();
+    S.near.use();
+  }
+
+  /* =========================================================
+     Update
+     ========================================================= */
+  let lastAct = '', lastObj = '';
+  function update(dt) {
+    const sc = SCENES[S.scene];
+    if (S.mode === 'play' && !S.busy) {
+      const dir = (keys.right || hold.right ? 1 : 0) - (keys.left || hold.left ? 1 : 0);
+      if (dir) {
+        S.facing = dir;
+        const nx = clamp(S.x + dir * SPEED * dt, sc.minX, sc.maxX);
+        S.moving = nx !== S.x; S.x = nx;
+      } else S.moving = false;
+      if (S.moving) S.phase += dt * 9;
+      if (S.moving && elCaption.classList.contains('show') && S.mode === 'play') { /* caption keeps fading on its own */ }
+    } else S.moving = false;
+
+    // nearest interactive object
+    let best = null, bd = REACH;
+    if (!S.won) for (const o of sc.objects) {
+      if (!o.use) continue;
+      const d = Math.abs(o.x - S.x);
+      if (d < bd) { bd = d; best = o; }
+    }
+    S.near = best;
+    const actLabel = best ? best.verb : 'ללכת';
+    if (actLabel !== lastAct) {
+      lastAct = actLabel;
+      btnAct.textContent = best ? `${best.verb} · ${best.label}` : 'מתקרבים לדלת או לחפץ';
+      btnAct.classList.toggle('idle', !best);
+    } else if (best && btnAct.dataset.obj !== best.label) {
+      btnAct.textContent = `${best.verb} · ${best.label}`;
+    }
+    btnAct.dataset.obj = best ? best.label : '';
+
+    const obj = S.mode === 'title' ? '' : sc.objective();
+    if (obj !== lastObj) { lastObj = obj; elObjective.innerHTML = obj ? 'מטרה: ' + obj : ''; }
+
+    // mood: colder near the start corner, warmer inward
+    const p = clamp((S.x - sc.minX) / (sc.maxX - sc.minX), 0, 1);
+    const target = S.won ? 1 : lerp(sc.mood[0], sc.mood[1], p);
+    S.mood = lerp(S.mood, target, 1 - Math.exp(-dt * 3));
+
+    // camera
+    const tc = camTarget();
+    S.cam = lerp(S.cam, tc, 1 - Math.exp(-dt * 6));
+  }
+
+  /* =========================================================
+     Render setup
+     ========================================================= */
+  let dpr = 1, cssW = 1, cssH = 1, scale = 1, viewW = 1, offY = 0;
+  function resize() {
+    const r = stage.getBoundingClientRect();
+    dpr = Math.min(2, window.devicePixelRatio || 1);
+    cssW = Math.max(1, r.width); cssH = Math.max(1, r.height);
+    cv.width = Math.round(cssW * dpr); cv.height = Math.round(cssH * dpr);
+    scale = Math.min(cssH / H, cssW / MIN_VIEW);
+    viewW = cssW / scale;
+    offY = (cssH - H * scale) * 0.55;
+    snapCam();
+  }
+  function camTarget() {
+    const sc = SCENES[S.scene];
+    if (sc.width <= viewW) return 0;
+    const focus = S.won ? 650 : S.x;
+    return clamp(focus - viewW / 2, 0, sc.width - viewW);
+  }
+  function snapCam() { S.cam = camTarget(); }
+  new ResizeObserver(resize).observe(stage);
+  window.addEventListener('resize', resize);
+
+  let oxW = 0, yTop = 0, yBot = H;
+  function world(par = 1) {
+    c.setTransform(dpr * scale, 0, 0, dpr * scale, dpr * (oxW - S.cam * par) * scale, dpr * offY);
+  }
+
+  /* precomputed decorative randomness */
+  const STARS = (() => { const r = rng(7); return Array.from({ length: 34 }, () => ({ x: r() * 1600, y: r(), s: .6 + r() * .8, p: r() * 6 })); })();
+  const FAR = (() => { const r = rng(42); return Array.from({ length: 9 }, (_, i) => ({ x: i * 230 + r() * 80, y: 40 + r() * 120, w: 110 + r() * 70, lit: r() })); })();
+  const LOWER = (() => { const r = rng(99); return Array.from({ length: 80 }, () => r()); })();
+
+  /* =========================================================
+     Render
+     ========================================================= */
+  function render() {
+    const sc = SCENES[S.scene];
+    const m = S.mood, t = S.t;
+    oxW = sc.width < viewW ? (viewW - sc.width) / 2 : 0;
+    yTop = -offY / scale - 2;
+    yBot = (cssH - offY) / scale + 2;
+
+    c.setTransform(dpr, 0, 0, dpr, 0, 0);
+    c.clearRect(0, 0, cssW, cssH);
+
+    if (sc.outside) drawOutsideBack(sc, m, t); else drawInsideBack(sc, m, t);
+
+    world(1);
+    for (const o of sc.objects) drawObject(o, sc, m, t);
+
+    if (!S.won) drawAvi(m);
+
+    if (sc.outside) drawOutsideFront(sc, m, t); else drawInsideFront(sc, m);
+
+    // prompt above nearest object
+    if (S.near && S.mode === 'play' && !S.busy) drawPrompt(S.near, t);
+
+    // vignette: heavier in the cold corners, softer inside
+    c.setTransform(dpr, 0, 0, dpr, 0, 0);
+    const vg = c.createRadialGradient(cssW / 2, cssH * .55, Math.min(cssW, cssH) * .25, cssW / 2, cssH * .55, Math.max(cssW, cssH) * .75);
+    vg.addColorStop(0, 'rgba(8,10,24,0)');
+    vg.addColorStop(1, `rgba(8,10,24,${(.62 * (1 - m)).toFixed(3)})`);
+    c.fillStyle = vg; c.fillRect(0, 0, cssW, cssH);
+    if (m > .6) { c.fillStyle = `rgba(255,190,120,${((m - .6) * .12).toFixed(3)})`; c.fillRect(0, 0, cssW, cssH); }
+  }
+
+  /* ---------- outside: sky, facade ---------- */
+  function drawOutsideBack(sc, m, t) {
+    world(0);
+    const L = -oxW - 20, W = viewW + 40;
+    const g = c.createLinearGradient(0, yTop, 0, FLOOR);
+    g.addColorStop(0, mix('#0b1024', '#2a1f45', m));
+    g.addColorStop(1, mix('#28365e', '#7d5672', m));
+    c.fillStyle = g; c.fillRect(L, yTop, W, FLOOR - yTop + 40);
+
+    // light-bulb stars hanging from nowhere
+    for (const s of STARS) {
+      const span = viewW + 200;
+      const x = ((s.x - S.cam * .06) % span + span) % span - 100 - oxW;
+      const y = lerp(yTop + 14, 150, s.y);
+      c.strokeStyle = 'rgba(200,210,255,.12)'; c.lineWidth = .6;
+      line(x, yTop, x, y - 3);
+      const fl = .55 + .45 * Math.sin(t * (reduceMotion ? 0 : 1.3) + s.p);
+      glow(x, y, 9 * s.s, '255,230,170', .35 * fl);
+      c.fillStyle = `rgba(255,240,200,${.6 + .4 * fl})`; circle(x, y, 1.6 * s.s);
+    }
+
+    // moon with a pull cord (a lamp someone left on)
+    const mx = viewW * .76 - oxW - S.cam * .03, my = Math.max(yTop + 70, 58);
+    c.strokeStyle = 'rgba(230,225,200,.35)'; c.lineWidth = 1;
+    line(mx, yTop, mx, my - 30);
+    line(mx + 14, my + 22, mx + 14, my + 58);
+    c.fillStyle = 'rgba(240,230,190,.8)'; circle(mx + 14, my + 60, 2.4);
+    glow(mx, my, 80, '255,238,190', .22 + .1 * m);
+    c.fillStyle = mix('#efe3bd', '#ffe3b0', m); circle(mx, my, 28);
+    c.fillStyle = 'rgba(180,165,130,.35)'; circle(mx - 9, my - 6, 5); circle(mx + 8, my + 9, 4); circle(mx + 10, my - 10, 2.5);
+
+    // a cloud shaped like a sofa, drifting
+    world(.15);
+    const cx = 200 + ((t * (reduceMotion ? 0 : 4)) % 900), cy = 95;
+    c.fillStyle = `rgba(210,200,235,${.12 + .08 * m})`;
+    rr(cx - 50, cy - 8, 100, 22, 10); c.fill();
+    rr(cx - 58, cy - 22, 18, 36, 9); c.fill();
+    rr(cx + 40, cy - 22, 18, 36, 9); c.fill();
+    rr(cx - 40, cy - 26, 80, 20, 9); c.fill();
+
+    // distant floating balconies (the building has opinions about gravity)
+    world(.35);
+    for (const f of FAR) {
+      const fx = f.x, fy = f.y + Math.sin(t * .4 + f.x) * (reduceMotion ? 0 : 2);
+      c.fillStyle = mix('#1a2140', '#3b2c4d', m);
+      c.fillRect(fx, fy, f.w, 46);
+      c.fillStyle = mix('#232b4d', '#4a3757', m);
+      c.fillRect(fx - 6, fy + 46, f.w + 12, 5);
+      c.fillStyle = f.lit > .5 ? 'rgba(255,205,130,.55)' : 'rgba(140,170,230,.25)';
+      c.fillRect(fx + 14, fy + 10, 16, 20); c.fillRect(fx + f.w - 34, fy + 10, 16, 20);
+      c.strokeStyle = 'rgba(200,205,235,.18)'; c.lineWidth = 1;
+      for (let bx = fx - 4; bx < fx + f.w + 6; bx += 6) line(bx, fy + 36, bx, fy + 46);
+    }
+
+    // back wall of the balcony
+    world(1);
+    const wallTop = FLOOR - 196;
+    const wg = c.createLinearGradient(0, wallTop, 0, FLOOR);
+    wg.addColorStop(0, mix('#323a55', '#5a4a66', m));
+    wg.addColorStop(1, mix('#262c42', '#4a3d58', m));
+    c.fillStyle = wg; c.fillRect(-400, wallTop, sc.width + 800, FLOOR - wallTop);
+    c.fillStyle = mix('#3f486a', '#6c5a78', m); c.fillRect(-400, wallTop - 8, sc.width + 800, 10);
+    c.strokeStyle = 'rgba(255,255,255,.035)'; c.lineWidth = 1;
+    for (let y = wallTop + 26; y < FLOOR; y += 26) line(-400, y, sc.width + 400, y);
+
+    for (const wx of sc.windows || []) drawWindow(wx, m);
+
+    // laundry line
+    if (sc.laundry) drawLaundry(sc.laundry[0], sc.laundry[1], m, t);
+
+    // wind near the start corner
+    if (sc.wind && !reduceMotion) {
+      const strength = clamp(1 - (S.x - sc.minX) / 420, 0, 1);
+      c.strokeStyle = `rgba(200,215,255,${.08 + .28 * strength})`; c.lineWidth = 1.4; c.lineCap = 'round';
+      for (let i = 0; i < 7; i++) {
+        const ph = (t * 90 + i * 83) % 520;
+        const x = 20 + ph, y = 120 + i * 21 + Math.sin(t * 2 + i) * 4;
+        c.beginPath(); c.moveTo(x, y); c.quadraticCurveTo(x + 22, y - 6, x + 44, y); c.stroke();
+      }
+    }
+  }
+
+  function drawWindow(x, m) {
+    const y = FLOOR - 160;
+    c.fillStyle = '#1b2035'; rr(x - 34, y - 4, 68, 84, 4); c.fill();
+    const g = c.createLinearGradient(0, y, 0, y + 76);
+    g.addColorStop(0, 'rgba(255,200,130,.35)'); g.addColorStop(1, 'rgba(255,170,110,.12)');
+    c.fillStyle = mix('#1e2742', '#3a2e3e', m); c.fillRect(x - 30, y, 60, 76);
+    c.fillStyle = g; c.fillRect(x - 30, y, 60, 76);
+    c.fillStyle = 'rgba(120,90,140,.55)';
+    c.beginPath(); c.moveTo(x - 30, y); c.quadraticCurveTo(x - 18, y + 40, x - 26, y + 76); c.lineTo(x - 30, y + 76); c.fill();
+    c.beginPath(); c.moveTo(x + 30, y); c.quadraticCurveTo(x + 18, y + 40, x + 26, y + 76); c.lineTo(x + 30, y + 76); c.fill();
+    c.strokeStyle = '#141829'; c.lineWidth = 2; line(x, y, x, y + 76);
+  }
+
+  function drawLaundry(x1, x2, m, t) {
+    const y = FLOOR - 176;
+    c.strokeStyle = 'rgba(230,230,240,.5)'; c.lineWidth = 1;
+    c.beginPath(); c.moveTo(x1, y); c.quadraticCurveTo((x1 + x2) / 2, y + 16, x2, y); c.stroke();
+    const items = [
+      { u: .12, w: 26, h: 30, col: '#d96b6b' }, { u: .3, w: 12, h: 22, col: '#f0d36a' },
+      { u: .48, w: 34, h: 36, col: '#7fb3d9' }, { u: .68, w: 12, h: 22, col: '#9ed39a' }, { u: .85, w: 24, h: 28, col: '#e8e2d6' },
+    ];
+    for (const it of items) {
+      const x = lerp(x1, x2, it.u), sag = Math.sin(it.u * Math.PI) * 8;
+      const sw = reduceMotion ? 0 : Math.sin(t * 1.6 + it.u * 9) * 3;
+      c.fillStyle = it.col; c.globalAlpha = .8;
+      rr(x - it.w / 2 + sw * .3, y + sag, it.w, it.h, 3); c.fill();
+      c.globalAlpha = 1;
+    }
+    // one sock decided to float. Nobody asked it to.
+    const fx = lerp(x1, x2, .58), fy = y - 26 + (reduceMotion ? 0 : Math.sin(t * 1.1) * 7);
+    c.fillStyle = '#c99adb'; c.save(); c.translate(fx, fy); c.rotate(-.3 + Math.sin(t) * .1);
+    rr(-4, -12, 9, 18, 3); c.fill(); rr(-4, 2, 15, 7, 3); c.fill(); c.restore();
+  }
+
+  function drawOutsideFront(sc, m, t) {
+    world(1);
+    // continuous railing in front of the walking area
+    const top = FLOOR - 52;
+    c.fillStyle = 'rgba(170,200,255,.07)'; c.fillRect(0, top, sc.width, 52);
+    c.strokeStyle = mix('#a9b2c9', '#d8c6c2', m); c.lineWidth = 2.6; c.lineCap = 'butt';
+    for (let x = 4; x < sc.width; x += 11) line(x, top + 4, x, FLOOR);
+    c.fillStyle = mix('#c9d1e4', '#ecd9cc', m);
+    rr(-10, top - 3, sc.width + 20, 7, 3.5); c.fill();
+    c.fillStyle = mix('#8f98b2', '#b7a3a6', m);
+    c.fillRect(-10, top + 22, sc.width + 20, 2.5);
+
+    // slab and the floors below
+    c.fillStyle = mix('#59617c', '#86717f', m); c.fillRect(-400, FLOOR, sc.width + 800, 14);
+    c.fillStyle = mix('#1f2540', '#3a2d48', m); c.fillRect(-400, FLOOR + 14, sc.width + 800, yBot - FLOOR);
+    let k = 0;
+    for (let row = 0; row < 4; row++) {
+      const y = FLOOR + 40 + row * 92;
+      if (y > yBot) break;
+      for (let x = -60; x < sc.width + 120; x += 150) {
+        const r = LOWER[k++ % LOWER.length];
+        c.fillStyle = r > .55 ? `rgba(255,200,130,${.25 + r * .2})` : 'rgba(120,140,200,.12)';
+        c.fillRect(x + 30, y, 40, 46);
+      }
+      c.fillStyle = mix('#2b3252', '#45364f', m); c.fillRect(-400, y + 60, sc.width + 800, 6);
+    }
+    // soft mist so the eye stays up here, with Avi
+    const mg = c.createLinearGradient(0, FLOOR + 14, 0, FLOOR + 160);
+    mg.addColorStop(0, 'rgba(160,150,200,0)'); mg.addColorStop(1, mix('#262a44', '#4a3a55', m));
+    c.fillStyle = mg; c.fillRect(-400, FLOOR + 14, sc.width + 800, Math.max(0, yBot - FLOOR));
+
+    // ends: always closed, always taller than Avi
+    if (sc.left === 'corner') drawCornerBarrier(m, t);
+    if (sc.left === 'partitionOpen') { drawPartition(-400, 62, m); drawGateArt(88, true, m); }
+    if (sc.right === 'partitionGate') drawPartition(1003, sc.width + 400, m);
+    if (sc.right === 'wall') drawPartition(900, sc.width + 400, m);
+  }
+
+  function drawPartition(x1, x2, m) {
+    c.fillStyle = mix('#3e4766', '#6c5874', m);
+    c.fillRect(x1, FLOOR - 214, x2 - x1, 228);
+    c.fillStyle = mix('#4c5679', '#7d6884', m);
+    c.fillRect(x1, FLOOR - 220, x2 - x1, 8);
+    c.fillStyle = 'rgba(0,0,0,.18)';
+    if (x1 > 0) c.fillRect(x1, FLOOR - 214, 6, 228); else c.fillRect(x2 - 6, FLOOR - 214, 6, 228);
+  }
+
+  function drawCornerBarrier(m, t) {
+    drawPartition(-400, 34, m);
+    // big planter box: nobody gets past this
+    c.fillStyle = '#7a4f36'; rr(34, FLOOR - 64, 76, 64, 5); c.fill();
+    c.fillStyle = '#8f5d40'; c.fillRect(34, FLOOR - 64, 76, 9);
+    c.fillStyle = '#3e7a55';
+    const sw = reduceMotion ? 0 : Math.sin(t * 1.4) * .08;
+    for (let i = 0; i < 7; i++) {
+      c.save(); c.translate(72, FLOOR - 60); c.rotate(-1 + i * .33 + sw);
+      ellipse(0, -38, 9, 40); c.restore();
+    }
+    c.fillStyle = '#2f6346'; ellipse(72, FLOOR - 112, 10, 34, .1 + sw);
+  }
+
+  /* ---------- inside ---------- */
+  function drawInsideBack(sc, m, t) {
+    world(0);
+    c.fillStyle = mix('#3a2a3a', '#4b3326', m); c.fillRect(-oxW - 20, yTop, viewW + 40, yBot - yTop);
+    world(1);
+    const ceil = FLOOR - 232, L = 40, R = sc.width - 40;
+    c.fillStyle = mix('#3b3046', '#3f2c24', m); c.fillRect(-400, yTop, sc.width + 800, yBot - yTop);
+    const wg = c.createLinearGradient(0, ceil, 0, FLOOR);
+    wg.addColorStop(0, mix('#8b7395', '#e0b27c', m));
+    wg.addColorStop(1, mix('#6e5a7c', '#c9925f', m));
+    c.fillStyle = wg; c.fillRect(L, ceil, R - L, FLOOR - ceil);
+    // wallpaper: tiny crescent moons
+    c.fillStyle = 'rgba(255,255,255,.08)';
+    for (let y = ceil + 22; y < FLOOR - 20; y += 34) {
+      for (let x = L + 18 + ((y / 34) % 2) * 17; x < R - 10; x += 34) {
+        c.beginPath(); c.arc(x, y, 5, 0, Math.PI * 2); c.arc(x + 2.5, y - 1.5, 4.2, 0, Math.PI * 2, true); c.fill();
+      }
+    }
+    c.fillStyle = mix('#9d86a6', '#f0cd9c', m); c.fillRect(L, ceil, R - L, 8);
+    c.fillStyle = mix('#5d4a66', '#8a5a3a', m); c.fillRect(L, FLOOR - 12, R - L, 12);
+    // floor boards
+    c.fillStyle = mix('#5a4552', '#8a5f3e', m); c.fillRect(L, FLOOR, R - L, yBot - FLOOR);
+    c.strokeStyle = 'rgba(0,0,0,.12)'; c.lineWidth = 1;
+    for (let y = FLOOR + 10; y < yBot; y += 14) line(L, y, R, y);
+    // hanging lamps
+    for (let x = 220; x < R; x += 340) {
+      c.strokeStyle = 'rgba(40,30,30,.6)'; line(x, ceil, x, ceil + 40);
+      glow(x, ceil + 52, 120, '255,210,140', .22 + .12 * m);
+      c.fillStyle = '#e9c98f';
+      c.beginPath(); c.moveTo(x - 18, ceil + 58); c.lineTo(x - 8, ceil + 40); c.lineTo(x + 8, ceil + 40); c.lineTo(x + 18, ceil + 58); c.fill();
+    }
+    // a teapot-shaped lamp in the living room, because why not
+    if (S.scene === 'living') {
+      const x = 560;
+      c.strokeStyle = 'rgba(40,30,30,.6)'; line(x, ceil, x, ceil + 30);
+      glow(x, ceil + 44, 90, '255,200,120', .25);
+      c.fillStyle = '#d98e6a'; ellipse(x, ceil + 44, 18, 14);
+      c.fillRect(x - 4, ceil + 26, 8, 6);
+      c.strokeStyle = '#d98e6a'; c.lineWidth = 4;
+      c.beginPath(); c.moveTo(x + 16, ceil + 40); c.quadraticCurveTo(x + 30, ceil + 34, x + 32, ceil + 26); c.stroke();
+    }
+  }
+  function drawInsideFront(sc, m) {
+    world(1);
+    c.fillStyle = mix('#2c2236', '#3c2a22', m);
+    c.fillRect(-400, yTop, 440, yBot - yTop);
+    c.fillRect(sc.width - 40, yTop, 440, yBot - yTop);
+    c.fillStyle = 'rgba(0,0,0,.2)';
+    c.fillRect(34, FLOOR - 232, 6, 232 + (yBot - FLOOR));
+    c.fillRect(sc.width - 40, FLOOR - 232, 6, 232 + (yBot - FLOOR));
+  }
+
+  /* ---------- objects ---------- */
+  function drawObject(o, sc, m, t) {
+    switch (o.art) {
+      case 'plant': return drawPlant(o.x, t);
+      case 'phone': return drawPhone(o.x, t);
+      case 'door': return drawDoor(o.x, o.door, false, t);
+      case 'chair': return drawChair(o.x);
+      case 'gate': return drawGateArt(o.x, !!F.gateOpen, m);
+      case 'cat': return drawCat(o.x, t);
+      case 'leviWindow': return drawLeviWindow(o.x, t);
+      case 'balconyDoor': return drawDoor(o.x, { ...DOOR.glass, glow: F.levi ? 'warm' : null }, !!F.levi, t);
+      case 'glassDecor': return drawDoor(o.x, { ...DOOR.glass, w: 50 }, false, t, true);
+      case 'doorDecor': return drawDoor(o.x, { ...DOOR.plain, w: 50 }, false, t);
+      case 'levi': return drawLevi(o.x, t);
+      case 'clock': return drawClock(o.x, t);
+      case 'armchair': return drawArmchair(o.x);
+      case 'painting': return drawPainting(o.x);
+      case 'fridge': return drawFridge(o.x);
+      case 'kettle': return drawKettle(o.x, t);
+      case 'kitchenWindow': return drawKitchenWindow(o.x, t);
+      case 'danny': return drawDanny(o.x, t);
+    }
+  }
+
+  function drawDoor(x, d, open, t, insideView) {
+    const w = d.w || 60, h = d.h || 124, x0 = x - w / 2, y0 = FLOOR - h;
+    const pulse = reduceMotion ? 1 : .8 + .2 * Math.sin(t * 2.2);
+    const rgb = d.glow === 'warm' ? '255,190,110' : '120,170,255';
+    if (d.glow) {
+      c.save(); c.beginPath(); c.rect(x - 90, FLOOR - 2, 180, 40); c.clip();
+      glow(x, FLOOR, 80, rgb, .4 * pulse); c.restore();
+    }
+    c.fillStyle = d.frame; rr(x0 - 5, y0 - 6, w + 10, h + 6, 4); c.fill();
+    if (open) {
+      const g = c.createLinearGradient(0, y0, 0, FLOOR);
+      g.addColorStop(0, 'rgba(255,214,150,1)'); g.addColorStop(1, 'rgba(255,180,110,1)');
+      c.fillStyle = g; c.fillRect(x0, y0, w, h);
+      glow(x, y0 + h / 2, 70, '255,200,130', .35 * pulse);
+      c.fillStyle = d.glass ? 'rgba(160,190,220,.55)' : d.fill;
+      c.fillRect(x0 + w - 14, y0, 14, h);
+      return;
+    }
+    if (d.glass) {
+      c.fillStyle = insideView ? 'rgba(40,50,90,.9)' : 'rgba(60,70,110,.9)'; c.fillRect(x0, y0, w, h);
+      c.fillStyle = 'rgba(255,255,255,.12)';
+      c.beginPath(); c.moveTo(x0 + 6, y0 + 10); c.lineTo(x0 + 18, y0 + 10); c.lineTo(x0 + 6, y0 + 40); c.fill();
+      c.fillStyle = 'rgba(200,160,210,.5)';
+      c.fillRect(x0, y0, 10, h); c.fillRect(x0 + w - 10, y0, 10, h);
+      c.strokeStyle = d.frame; c.lineWidth = 3; line(x, y0, x, FLOOR);
+      return;
+    }
+    c.fillStyle = d.fill; c.fillRect(x0, y0, w, h);
+    c.strokeStyle = 'rgba(0,0,0,.18)'; c.lineWidth = 2;
+    c.strokeRect(x0 + 8, y0 + 10, w - 16, h * .36);
+    c.strokeRect(x0 + 8, y0 + h * .52, w - 16, h * .4);
+    c.fillStyle = '#e8d38a'; circle(x0 + w - 11, y0 + h * .55, 3);
+    if (d.glow) {
+      c.fillStyle = `rgba(${rgb},${.85 * pulse})`; c.fillRect(x0 + 2, FLOOR - 3, w - 4, 3);
+      c.fillStyle = `rgba(${rgb},${.55 * pulse})`; c.fillRect(x0 + 12, y0 + 14, w - 24, 18);
+    }
+    if (d.sign) {
+      c.fillStyle = '#e8e4da'; rr(x - 22, y0 - 26, 44, 16, 3); c.fill();
+      c.fillStyle = '#333'; c.font = `700 10px ${FONT}`; c.textAlign = 'center'; c.textBaseline = 'middle'; c.direction = 'rtl';
+      c.fillText(d.sign, x, y0 - 18);
+    }
+    if (d.icon) drawIcon(d.icon, x, y0 + 26, t);
+  }
+
+  function drawIcon(kind, x, y, t) {
+    if (kind === 'lemon') {
+      c.fillStyle = '#f7e04a'; ellipse(x, y, 9, 6.5);
+      c.fillStyle = '#6aa84f'; ellipse(x + 6, y - 6, 4, 2, -.5);
+    } else if (kind === 'moth') {
+      c.fillStyle = '#d8ccb8';
+      ellipse(x - 5, y, 6, 4, -.4); ellipse(x + 5, y, 6, 4, .4);
+      c.fillStyle = '#5a4a3a'; ellipse(x, y, 1.6, 5);
+    } else if (kind === 'toast') {
+      c.fillStyle = '#e8b06a'; rr(x - 9, y - 7, 18, 15, 4); c.fill();
+      c.fillStyle = '#f6d79e'; rr(x - 6, y - 4, 12, 9, 3); c.fill();
+      c.strokeStyle = 'rgba(255,240,220,.6)'; c.lineWidth = 1.4;
+      for (let i = -1; i <= 1; i++) {
+        const o = reduceMotion ? 0 : Math.sin(t * 2 + i) * 2;
+        c.beginPath(); c.moveTo(x + i * 5, y - 10); c.quadraticCurveTo(x + i * 5 + 4 + o, y - 16, x + i * 5, y - 22); c.stroke();
+      }
+    }
+  }
+
+  function drawGateArt(x, open, m) {
+    const h = 96, w = 54, x0 = x - w / 2, y0 = FLOOR - h;
+    c.fillStyle = mix('#5c6585', '#8a7690', m);
+    c.fillRect(x0 - 4, y0 - 6, 6, h + 6); c.fillRect(x0 + w - 2, y0 - 6, 6, h + 6);
+    if (open) {
+      glow(x, FLOOR - 40, 60, '255,200,130', .25);
+      c.save(); c.translate(x0 + w, y0); c.scale(.32, 1);
+    } else { c.save(); c.translate(x0, y0); }
+    c.strokeStyle = mix('#b8c0d6', '#d9c6c0', m); c.lineWidth = open ? 6 : 2.2;
+    c.strokeRect(open ? -w : 0, 0, w, h);
+    for (let i = 1; i < 6; i++) { const bx = (open ? -w : 0) + i * w / 6; line(bx, 0, bx, h); }
+    c.restore();
+    if (!open) { c.fillStyle = '#b07a46'; rr(x0 + w - 12, y0 + h / 2 - 4, 12, 8, 2); c.fill(); }
+  }
+
+  function drawPlant(x, t) {
+    const sw = reduceMotion ? 0 : Math.sin(t * 1.2) * .1;
+    c.fillStyle = '#4e9a6a';
+    for (let i = 0; i < 5; i++) { c.save(); c.translate(x, FLOOR - 46); c.rotate(-.9 + i * .45 + sw); ellipse(0, -18, 7, 20); c.restore(); }
+    c.fillStyle = '#c86f4a';
+    c.beginPath(); c.moveTo(x - 22, FLOOR - 50); c.lineTo(x + 22, FLOOR - 50); c.lineTo(x + 16, FLOOR); c.lineTo(x - 16, FLOOR); c.fill();
+    c.fillStyle = '#d98058'; c.fillRect(x - 24, FLOOR - 54, 48, 7);
+    const blink = (t % 4.3) < .14;
+    c.fillStyle = '#2a1a14';
+    if (blink) { c.fillRect(x - 10, FLOOR - 33, 7, 1.6); c.fillRect(x + 3, FLOOR - 33, 7, 1.6); }
+    else { circle(x - 6, FLOOR - 33, 2.4); circle(x + 6, FLOOR - 33, 2.4); }
+    c.strokeStyle = '#2a1a14'; c.lineWidth = 1.5;
+    c.beginPath(); c.arc(x, FLOOR - 26, 5, .2, Math.PI - .2); c.stroke();
+  }
+
+  function drawPhone(x, t) {
+    c.fillStyle = '#c9c3b8'; ellipse(x, FLOOR - 46, 26, 6);
+    c.fillRect(x - 2, FLOOR - 46, 4, 44); ellipse(x, FLOOR - 2, 12, 3);
+    c.fillStyle = '#1a1a22'; rr(x - 8, FLOOR - 74, 16, 28, 3); c.fill();
+    const lit = !F.called;
+    const p = reduceMotion ? 1 : .6 + .4 * Math.sin(t * 3);
+    c.fillStyle = lit ? `rgba(140,200,255,${.6 + .4 * p})` : 'rgba(90,100,120,.6)';
+    c.fillRect(x - 6, FLOOR - 71, 12, 21);
+    if (lit) glow(x, FLOOR - 60, 30, '140,200,255', .3 * p);
+    c.fillStyle = lit ? '#e94b4b' : '#555';
+    c.fillRect(x - 4, FLOOR - 56, lit ? 2 : 1, 3);
+  }
+
+  function drawChair(x) {
+    c.strokeStyle = '#e6e2da'; c.lineWidth = 4; c.lineCap = 'round';
+    line(x - 14, FLOOR - 36, x + 14, FLOOR - 36);
+    line(x - 12, FLOOR - 36, x - 16, FLOOR); line(x + 12, FLOOR - 36, x + 16, FLOOR);
+    line(x + 14, FLOOR - 36, x + 16, FLOOR - 76);
+    c.fillStyle = '#e6e2da'; rr(x + 10, FLOOR - 80, 9, 30, 3); c.fill();
+  }
+
+  function drawCat(x, t) {
+    const sw = reduceMotion ? 0 : Math.sin(t * 2) * .35;
+    c.strokeStyle = '#3b3340'; c.lineWidth = 5; c.lineCap = 'round';
+    c.beginPath(); c.moveTo(x + 12, FLOOR - 6); c.quadraticCurveTo(x + 30, FLOOR - 10, x + 28 + sw * 10, FLOOR - 30); c.stroke();
+    c.fillStyle = '#3b3340'; ellipse(x, FLOOR - 18, 16, 18);
+    circle(x - 2, FLOOR - 42, 11);
+    c.beginPath(); c.moveTo(x - 11, FLOOR - 47); c.lineTo(x - 9, FLOOR - 60); c.lineTo(x - 3, FLOOR - 51); c.fill();
+    c.beginPath(); c.moveTo(x + 7, FLOOR - 47); c.lineTo(x + 6, FLOOR - 60); c.lineTo(x - 1, FLOOR - 51); c.fill();
+    const blink = (t % 5.1) < .15;
+    c.fillStyle = '#ffd35a';
+    if (!blink) { ellipse(x - 6, FLOOR - 43, 2.2, 3); ellipse(x + 3, FLOOR - 43, 2.2, 3); }
+    // tie
+    c.fillStyle = '#d9534f';
+    c.beginPath(); c.moveTo(x - 4, FLOOR - 31); c.lineTo(x + 2, FLOOR - 31); c.lineTo(x + 3, FLOOR - 16); c.lineTo(x - 1, FLOOR - 12); c.lineTo(x - 5, FLOOR - 16); c.fill();
+  }
+
+  function drawLeviWindow(x, t) {
+    const y = FLOOR - 168, w = 96, h = 86;
+    glow(x, y + h / 2, 110, '255,205,120', .3);
+    c.fillStyle = '#e8e3d8'; rr(x - w / 2 - 5, y - 5, w + 10, h + 10, 4); c.fill();
+    c.fillStyle = '#ffd590'; c.fillRect(x - w / 2, y, w, h);
+    c.fillStyle = 'rgba(255,170,90,.35)'; c.fillRect(x - w / 2, y + h * .6, w, h * .4);
+    if (!F.levi) {
+      const bob = reduceMotion ? 0 : Math.sin(t * 1.3) * 1.2;
+      c.fillStyle = '#7d5aa6'; rr(x - 22, y + 52 + bob, 44, 40, 14); c.fill();
+      c.fillStyle = '#e6c2a2'; circle(x, y + 40 + bob, 14);
+      c.fillStyle = '#c9c4cc'; circle(x, y + 33 + bob, 13);
+      c.fillStyle = '#e6c2a2'; circle(x, y + 42 + bob, 12);
+      c.fillStyle = '#f29bb5'; for (let i = -1; i <= 1; i++) circle(x + i * 9, y + 26 + bob, 4.5);
+      c.strokeStyle = '#3a2c40'; c.lineWidth = 1.6;
+      c.beginPath(); c.arc(x - 5, y + 42 + bob, 5, 0, Math.PI * 2); c.stroke();
+      c.beginPath(); c.arc(x + 6, y + 42 + bob, 5, 0, Math.PI * 2); c.stroke();
+    } else {
+      c.fillStyle = '#fff'; rr(x - 8, y + 58, 16, 12, 3); c.fill();
+      c.strokeStyle = 'rgba(255,255,255,.7)'; c.lineWidth = 1.4;
+      const o = reduceMotion ? 0 : Math.sin(t * 2) * 2;
+      c.beginPath(); c.moveTo(x, y + 54); c.quadraticCurveTo(x + 5 + o, y + 46, x, y + 38); c.stroke();
+    }
+    c.strokeStyle = '#e8e3d8'; c.lineWidth = 3; line(x, y, x, y + h); line(x - w / 2, y + h / 2, x + w / 2, y + h / 2);
+    c.fillStyle = '#7a4f36'; c.fillRect(x - w / 2 - 6, y + h + 5, w + 12, 12);
+    c.fillStyle = '#5ea86f'; for (let i = 0; i < 6; i++) ellipse(x - w / 2 + 6 + i * 17, y + h + 1, 6, 7);
+  }
+
+  function drawClock(x, t) {
+    const y = FLOOR - 168;
+    c.fillStyle = '#6b4a34'; circle(x, y, 28);
+    c.fillStyle = '#7fc4e0'; circle(x, y, 23);
+    const a = reduceMotion ? 1 : t * .9;
+    const fx = x + Math.cos(a) * 12, fy = y + Math.sin(a) * 9;
+    c.save(); c.translate(fx, fy); c.rotate(a + Math.PI / 2);
+    c.fillStyle = '#f08a3e'; ellipse(0, 0, 6, 3.5);
+    c.beginPath(); c.moveTo(-5, 0); c.lineTo(-10, -4); c.lineTo(-10, 4); c.fill(); c.restore();
+    c.strokeStyle = '#2b2b33'; c.lineWidth = 2;
+    line(x, y, x, y - 14); line(x, y, x + 10, y + 3);
+    c.fillStyle = '#2b2b33'; circle(x, y, 2);
+  }
+
+  function drawArmchair(x) {
+    c.fillStyle = '#7b4e7a';
+    rr(x - 34, FLOOR - 52, 68, 40, 10); c.fill();
+    rr(x - 30, FLOOR - 92, 60, 48, 14); c.fill();
+    rr(x - 40, FLOOR - 62, 14, 40, 6); c.fill(); rr(x + 26, FLOOR - 62, 14, 40, 6); c.fill();
+    c.fillStyle = '#3a2a2a'; c.fillRect(x - 30, FLOOR - 12, 5, 12); c.fillRect(x + 25, FLOOR - 12, 5, 12);
+    // a hat, sitting by itself, waiting for someone
+    c.fillStyle = '#20202a'; c.fillRect(x - 20, FLOOR - 58, 40, 5); rr(x - 12, FLOOR - 80, 24, 24, 3); c.fill();
+    c.fillStyle = '#b84a4a'; c.fillRect(x - 12, FLOOR - 63, 24, 4);
+  }
+
+  function drawPainting(x) {
+    const y = FLOOR - 186;
+    c.fillStyle = '#b0874a'; c.fillRect(x - 34, y, 68, 88);
+    c.fillStyle = '#f1e6cc'; c.fillRect(x - 28, y + 6, 56, 76);
+    c.fillStyle = '#6a8fb5'; c.fillRect(x - 12, y + 18, 24, 46);
+    c.fillStyle = '#e8d38a'; circle(x + 7, y + 43, 2);
+    c.fillStyle = '#4a3a2a'; c.font = `600 8px ${FONT}`; c.textAlign = 'center'; c.textBaseline = 'middle'; c.direction = 'rtl';
+    c.fillText('זו לא דלת', x, y + 73);
+  }
+
+  function drawLevi(x, t) {
+    drawPerson(x, { facing: 1, shirt: '#7d5aa6', pants: '#6a4a90', skin: '#e6c2a2', hair: '#c9c4cc', robe: true, curlers: true, glasses: true, cup: true, hunch: 0, smile: true });
+  }
+
+  function drawFridge(x) {
+    c.fillStyle = '#e9eef0'; rr(x - 30, FLOOR - 158, 60, 158, 8); c.fill();
+    c.strokeStyle = 'rgba(0,0,0,.12)'; c.lineWidth = 2; line(x - 30, FLOOR - 104, x + 30, FLOOR - 104);
+    c.fillStyle = '#b7bec4'; c.fillRect(x + 20, FLOOR - 140, 4, 26); c.fillRect(x + 20, FLOOR - 94, 4, 30);
+    const letters = ['ל', 'נ', 'ש', 'ו', 'ם'], cols = ['#e05d5d', '#f0b93a', '#4fa3d1', '#6cbf6c', '#a77bd1'];
+    c.font = `800 12px ${FONT}`; c.textAlign = 'center'; c.textBaseline = 'middle';
+    letters.forEach((l, i) => { c.fillStyle = cols[i]; c.fillText(l, x + 16 - i * 9, FLOOR - 128 + (i % 2) * 4); });
+  }
+
+  function drawKettle(x, t) {
+    c.fillStyle = '#c9b49a'; c.fillRect(x - 46, FLOOR - 70, 92, 70);
+    c.fillStyle = '#ece2d2'; c.fillRect(x - 50, FLOOR - 76, 100, 8);
+    c.fillStyle = '#d0533f'; ellipse(x, FLOOR - 92, 18, 15); c.fillRect(x - 15, FLOOR - 90, 30, 14);
+    c.strokeStyle = '#d0533f'; c.lineWidth = 4;
+    c.beginPath(); c.arc(x, FLOOR - 104, 10, Math.PI, 0); c.stroke();
+    c.beginPath(); c.moveTo(x + 15, FLOOR - 88); c.lineTo(x + 28, FLOOR - 100); c.stroke();
+    c.strokeStyle = 'rgba(255,255,255,.55)'; c.lineWidth = 2;
+    for (let i = 0; i < 3; i++) {
+      const ph = reduceMotion ? i * 8 : (t * 18 + i * 12) % 36;
+      const a = 1 - ph / 36;
+      c.globalAlpha = a;
+      c.beginPath(); c.moveTo(x + 30, FLOOR - 104 - ph); c.quadraticCurveTo(x + 38, FLOOR - 112 - ph, x + 32, FLOOR - 120 - ph); c.stroke();
+    }
+    c.globalAlpha = 1;
+  }
+
+  function drawKitchenWindow(x, t) {
+    const y = FLOOR - 186, w = 110, h = 92;
+    c.fillStyle = '#efe6d6'; rr(x - w / 2 - 6, y - 6, w + 12, h + 12, 4); c.fill();
+    const g = c.createLinearGradient(0, y, 0, y + h);
+    const dawn = S.won ? 1 : .35;
+    g.addColorStop(0, mix('#2a2c55', '#8fb3e0', dawn)); g.addColorStop(1, mix('#7a5272', '#ffc98f', dawn));
+    c.fillStyle = g; c.fillRect(x - w / 2, y, w, h);
+    c.save(); c.beginPath(); c.rect(x - w / 2, y, w, h); c.clip();
+    c.fillStyle = '#ffd27a'; circle(x + 20, y + h + 18 - dawn * 34, 20);
+    glow(x + 20, y + h - dawn * 20, 60, '255,210,130', .4 * dawn);
+    c.restore();
+    c.strokeStyle = '#efe6d6'; c.lineWidth = 3; line(x, y, x, y + h);
+    c.fillStyle = '#5ea86f'; c.fillRect(x - w / 2, y + h + 6, w, 4);
+  }
+
+  function drawDanny(x, t) {
+    // table
+    c.fillStyle = '#a0683e'; c.fillRect(x - 40, FLOOR - 58, 80, 7);
+    c.fillRect(x - 34, FLOOR - 51, 5, 51); c.fillRect(x + 29, FLOOR - 51, 5, 51);
+    c.fillStyle = '#f2ede4'; rr(x - 10, FLOOR - 70, 10, 12, 2); c.fill();
+    c.fillStyle = '#e6b25a'; circle(x + 12, FLOOR - 61, 6);
+    // chairs
+    const chair = (cx, f) => {
+      c.fillStyle = '#7a4a2a'; c.fillRect(cx - 14, FLOOR - 40, 28, 5);
+      c.fillRect(cx - 12, FLOOR - 35, 4, 35); c.fillRect(cx + 8, FLOOR - 35, 4, 35);
+      c.fillRect(cx + f * 12, FLOOR - 92, 4, 57);
+    };
+    chair(x + 48, 1);
+    drawPerson(x + 46, { facing: -1, sit: true, shirt: '#e08a3c', pants: '#3a4660', skin: '#e2b895', hair: '#4a3328', smile: true });
+    if (S.won) {
+      chair(x - 48, -1);
+      drawPerson(x - 46, { facing: 1, sit: true, shirt: '#7d8aa8', pants: '#343a4f', skin: '#e8c3a0', hair: '#2f2622', hunch: .1, smile: true });
+      c.fillStyle = '#f2ede4'; rr(x - 26, FLOOR - 70, 10, 12, 2); c.fill();
+      // Mrs. Levi, pretending not to listen
+      drawPerson(x - 140, { facing: 1, shirt: '#7d5aa6', pants: '#6a4a90', skin: '#e6c2a2', hair: '#c9c4cc', robe: true, curlers: true, glasses: true, cup: true, smile: true });
+      // hearts of steam
+      c.strokeStyle = 'rgba(255,255,255,.55)'; c.lineWidth = 1.5;
+      for (const sx of [x - 21, x - 5]) {
+        const o = reduceMotion ? 0 : Math.sin(t * 2 + sx) * 2;
+        c.beginPath(); c.moveTo(sx, FLOOR - 74); c.quadraticCurveTo(sx + 5 + o, FLOOR - 82, sx, FLOOR - 90); c.stroke();
+      }
+    }
+  }
+
+  /* ---------- people ---------- */
+  function drawAvi(m) {
+    drawPerson(S.x, {
+      facing: S.facing, phase: S.phase, moving: S.moving,
+      hunch: clamp(1 - m * 1.15, 0, 1),
+      shirt: '#7d8aa8', pants: '#343a4f', skin: '#e8c3a0', hair: '#2f2622',
+      smile: m > .85,
+    });
+  }
+
+  function drawPerson(x, o) {
+    const f = o.facing || 1, hunch = o.hunch || 0, mv = !!o.moving, ph = o.phase || 0;
+    c.save(); c.translate(x, FLOOR); c.scale(f, 1);
+    c.lineCap = 'round'; c.lineJoin = 'round';
+    const bob = mv ? Math.abs(Math.sin(ph)) * 2 : (reduceMotion ? 0 : Math.sin(S.t * 1.6 + x) * .8);
+    let hipX = 0, hipY = -42 - bob;
+
+    // legs
+    c.strokeStyle = o.pants; c.lineWidth = 9;
+    if (o.sit) {
+      hipY = -40;
+      c.beginPath(); c.moveTo(0, hipY); c.lineTo(20, hipY); c.lineTo(22, -3); c.stroke();
+      c.strokeStyle = shade(o.pants);
+      c.beginPath(); c.moveTo(-2, hipY + 1); c.lineTo(16, hipY + 1); c.lineTo(17, -3); c.stroke();
+    } else if (!o.robe) {
+      const a = mv ? Math.sin(ph) * .5 : 0;
+      c.strokeStyle = shade(o.pants); line(hipX, hipY, -Math.sin(a) * 20, -3);
+      c.strokeStyle = o.pants; line(hipX, hipY, Math.sin(a) * 20, -3);
+    }
+    if (o.robe) {
+      c.fillStyle = o.pants;
+      c.beginPath(); c.moveTo(-11, -72); c.lineTo(11, -72); c.lineTo(17, -4); c.lineTo(-17, -4); c.fill();
+      c.fillStyle = '#f2b6c9'; ellipse(-8, -3, 7, 3); ellipse(9, -3, 7, 3);
+    }
+
+    // torso
+    const shX = hunch * 8, shY = -80 + hunch * 6 - bob + (o.sit ? 2 : 0);
+    c.strokeStyle = o.shirt; c.lineWidth = 20;
+    line(hipX, hipY - 4, shX, shY + 8);
+
+    // back arm
+    const sw = mv ? -Math.sin(ph) * .55 : 0;
+    c.strokeStyle = shade(o.shirt); c.lineWidth = 7;
+    if (o.sit) line(shX, shY + 4, shX + 20, shY + 20);
+    else line(shX, shY + 4, shX - Math.sin(sw) * 16 + hunch * 3, shY + 34 - hunch * 2);
+
+    // head
+    const hx = shX + 3 + hunch * 7, hy = shY - 14 + hunch * 6;
+    c.strokeStyle = o.skin; c.lineWidth = 6; line(shX + 1, shY, hx - 1, hy + 8);
+    c.fillStyle = o.skin; circle(hx, hy, 11);
+    c.fillStyle = o.hair;
+    c.beginPath(); c.arc(hx - 1, hy - 1, 11.8, Math.PI * .92, Math.PI * 2.02); c.fill();
+    c.beginPath(); c.arc(hx - 4, hy, 9, Math.PI * .5, Math.PI * 1.3); c.fill();
+    if (o.curlers) { c.fillStyle = '#f29bb5'; for (let i = -1; i <= 1; i++) circle(hx - 2 + i * 7, hy - 12, 3.6); }
+    // eye & brow
+    const ey = hy - 1 + hunch * 1.5;
+    c.fillStyle = '#1e1a22'; circle(hx + 5, ey, 1.5);
+    if (o.glasses) { c.strokeStyle = '#3a2c40'; c.lineWidth = 1.3; c.beginPath(); c.arc(hx + 5, ey, 4, 0, Math.PI * 2); c.stroke(); }
+    c.strokeStyle = o.hair === '#c9c4cc' ? '#8d8792' : o.hair; c.lineWidth = 1.4;
+    if (hunch > .45) line(hx + 2, ey - 5, hx + 8, ey - 3.5); else line(hx + 2, ey - 4.5, hx + 8, ey - 5);
+    c.strokeStyle = '#6b3d33'; c.lineWidth = 1.3;
+    if (o.smile) { c.beginPath(); c.arc(hx + 5, hy + 4, 3, .2, Math.PI - .6); c.stroke(); }
+    else line(hx + 3, hy + 6, hx + 7, hy + 6);
+
+    // front arm
+    c.strokeStyle = o.shirt; c.lineWidth = 7;
+    let handX, handY;
+    if (o.sit) { handX = shX + 24; handY = shY + 20; }
+    else if (o.cup) { handX = shX + 16; handY = shY + 22; }
+    else { handX = shX + Math.sin(sw) * 16 + hunch * 3; handY = shY + 34 - hunch * 2; }
+    line(shX, shY + 4, handX, handY);
+    c.fillStyle = o.skin; circle(handX, handY, 3.5);
+    if (o.cup) { c.fillStyle = '#f2ede4'; rr(handX - 2, handY - 10, 10, 10, 2); c.fill(); }
+    c.restore();
+  }
+  function shade(col) {
+    if (col[0] !== '#') return col;
+    const [r, g, b] = hex(col);
+    return `rgb(${r * .78 | 0},${g * .78 | 0},${b * .78 | 0})`;
+  }
+
+  /* ---------- interaction prompt ---------- */
+  function drawPrompt(o, t) {
+    const txt = `${o.label} · ${o.verb}`;
+    c.font = `700 12px ${FONT}`; c.direction = 'rtl'; c.textAlign = 'center'; c.textBaseline = 'middle';
+    const w = c.measureText(txt).width + 22;
+    const top = o.art === 'leviWindow' || o.art === 'clock' || o.art === 'painting' ? FLOOR - 226 : FLOOR - 160;
+    const y = top + (reduceMotion ? 0 : Math.sin(t * 3) * 2);
+    c.fillStyle = 'rgba(255,244,226,.95)'; rr(o.x - w / 2, y - 12, w, 24, 12); c.fill();
+    c.beginPath(); c.moveTo(o.x - 6, y + 12); c.lineTo(o.x + 6, y + 12); c.lineTo(o.x, y + 18); c.fill();
+    c.fillStyle = '#3d2a1c'; c.fillText(txt, o.x, y + 1);
+  }
+
+  /* =========================================================
+     Loop
+     ========================================================= */
+  let last = performance.now();
+  function frame(now) {
+    const dt = Math.min(.05, (now - last) / 1000); last = now;
+    S.t += dt;
+    update(dt);
+    render();
+    requestAnimationFrame(frame);
+  }
+
+  renderLives(false);
+  resize();
+  requestAnimationFrame(frame);
+  setTimeout(() => $('btnStart').focus({ preventScroll: true }), 50);
+  window.__game = { S, newGame, goTo }; // handy for debugging in the console
+})();
+</script>
+</body>
+</html>
